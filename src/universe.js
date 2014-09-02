@@ -1,3 +1,6 @@
+/*jslint indent: 2*/
+/*global wxs3: false */
+
 // extraction for URL parameters
 function getQueryVariable(variable) {
   var pair, i;
@@ -31,7 +34,7 @@ function urlformat(values) {
 }
 
 // TODO: Update this to allow for wmts, variable wcs ++
-Dim = {
+var Dim = {
   width: window.innerWidth,
   height: window.innerHeight,
   bbox: getQueryVariable("BBOX") || '161244,6831251,171526,6837409',
@@ -39,7 +42,7 @@ Dim = {
   maxx: 0,
   miny: 0,
   maxy: 0,
-  Z:0,
+  Z: 0,
   getBounds: function () {
     return {
       minx: this.minx,
@@ -68,12 +71,12 @@ Dim = {
   wmtsLayer: getQueryVariable("LAYER") || 'topo2',
   wmtsUrl: getQueryVariable("WMTS") || 'http://opencache.statkart.no/gatekeeper/gk/gk.open_wmts',
   wmscUrl:  getQueryVariable("WMSC") || 'http://opencache.statkart.no/gatekeeper/gk/gk.open_cache',
-  wcsUrl: getQueryVariable("WCS")||'http://wms.geonorge.no/skwms1/wcs.dtm',
+  wcsUrl: getQueryVariable("WCS") || 'http://wms.geonorge.no/skwms1/wcs.dtm',
   wmsFormat: getQueryVariable("WMSFORMAT") || "image/png",
   wmsFormatMode: "",
   zMult: getQueryVariable("ZMULT") || 1
 };
 
 var dim = Dim.init();
-var wmsLayers = getQueryVariable("LAYERS") || layers;
+var wmsLayers = getQueryVariable("LAYERS") || window.layers;
 var threeDMap = new wxs3.ThreeDMap(wmsLayers, dim);

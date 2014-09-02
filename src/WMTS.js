@@ -1,4 +1,7 @@
-var wxs3 = wxs3 || {};
+/*global XMLHttpRequest: false, XPathResult: false, DOMParser: false, ActiveXObject: false */
+/*jslint indent: 2*/
+
+var wxs3 = this.wxs3 || {};
 
 (function (ns) {
   'use strict';
@@ -6,7 +9,7 @@ var wxs3 = wxs3 || {};
   ns.WMTS = function (capabilitiesURL, epsg, layer) {
     this.tileMatrixSet = {};
     this.epsg = epsg;
-    this.layer= layer;
+    this.layer = layer;
     this.capabilitiesURL = capabilitiesURL;
   };
 
@@ -27,6 +30,56 @@ var wxs3 = wxs3 || {};
   };
 
 
+  function getTileMatrixSetLinks(layer, capabilitiesXml, resolver, thisNode) {
+    var tileMatrixSetLinks = [];
+
+    // TODO: Find layers from capabilities and check if crs is supported by layer. Example xpath:
+    //var iterator=capabilitiesXml.evaluate("//default:Capabilities/default:Contents/default:Layer[child::ows:Identifier[text()='" + this.layer + "']]",capabilitiesXml, resolver,XPathResult.ANY_TYPE, null);
+    var iterator = capabilitiesXml.evaluate(
+        "//default:Capabilities/default:Contents/default:Layer[child::ows:Identifier[text()='" + layer + "']]/default:TileMatrixSetLink/default:TileMatrixSet",
+        capabilitiesXml,
+        resolver,
+        XPathResult.ANY_TYPE,
+        null
+      );
+    try {
+      thisNode = iterator.iterateNext();
+      while (thisNode) {
+        tileMatrixSetLinks.push(thisNode.textContent);
+        thisNode = iterator.iterateNext();
+      }
+
+    } catch (e) {
+      console.log('Error: An error occured during iteration ' + e);
+    }
+    return tileMatrixSetLinks;
+  }
+
+
+  function getTileMatrixSetIdentifier(epsg, capabilitiesXml, resolver, thisNode) {
+    var iterator = capabilitiesXml.evaluate(
+      "//default:Capabilities/default:Contents/default:TileMatrixSet[child::ows:SupportedCRS[text()='urn:ogc:def:crs:EPSG::" + epsg + "']]/ows:Identifier",
+      capabilitiesXml,
+      resolver,
+      XPathResult.ANY_TYPE,
+      null
+    );
+
+    try {
+      var tileMatrixSetIdentifier = null;
+      thisNode = iterator.iterateNext();
+      while (thisNode) {
+        tileMatrixSetIdentifier = thisNode.textContent;
+        thisNode = iterator.iterateNext();
+      }
+      return tileMatrixSetIdentifier;
+
+    } catch (e) {
+      console.log('Error: An error occured during iteration ' + e);
+      return null;
+    }
+  }
+
   ns.WMTS.prototype.parseCapabilities = function (capabilitiesXml) {
     var thisNode;
     var tileMatrixSet = [];
@@ -37,59 +90,35 @@ var wxs3 = wxs3 || {};
     // Hacky namespace-resolver to read default namespace. suggestions welcome   
     var resolver = {
       lookupNamespaceURI: function lookup(aPrefix) {
-        if (aPrefix == "default") {
+        if (aPrefix === "default") {
           return capabilitiesXml.documentElement.namespaceURI;
         }
-        else if (aPrefix == 'ows') {
+        if (aPrefix === 'ows') {
           return 'http://www.opengis.net/ows/1.1';
         }
       }
     };
 
-    var tileMatrixSetLinks=[];
 
-    // TODO: Find layers from capabilities and check if crs is supported by layer. Example xpath:
-    //var iterator=capabilitiesXml.evaluate("//default:Capabilities/default:Contents/default:Layer[child::ows:Identifier[text()='" + this.layer + "']]",capabilitiesXml, resolver,XPathResult.ANY_TYPE, null);
-    var iterator=capabilitiesXml.evaluate("//default:Capabilities/default:Contents/default:Layer[child::ows:Identifier[text()='" + this.layer + "']]/default:TileMatrixSetLink/default:TileMatrixSet",capabilitiesXml, resolver,XPathResult.ANY_TYPE, null);
-    try {
-      thisNode = iterator.iterateNext();
-      while (thisNode) {
-        tileMatrixSetLinks.push(thisNode.textContent);
-        thisNode = iterator.iterateNext();
-      }
-
-    }
-    catch (e) {
-      console.log('Error: An error occured during iteration ' + e);
-    }
-
-
-    var iterator = capabilitiesXml.evaluate(
-        "//default:Capabilities/default:Contents/default:TileMatrixSet[child::ows:SupportedCRS[text()='urn:ogc:def:crs:EPSG::" + this.epsg + "']]/ows:Identifier",
+    var tileMatrixSetLinks = getTileMatrixSetLinks(
+      this.layer,
       capabilitiesXml,
       resolver,
-      XPathResult.ANY_TYPE,
-      null
+      thisNode
     );
 
-    var tileMatrixSetIdentifier=null;
-
-    try {
-      thisNode = iterator.iterateNext();
-      while (thisNode) {
-        tileMatrixSetIdentifier=thisNode.textContent;
-        thisNode = iterator.iterateNext();
-      }
-
-    }
-    catch (e) {
-      console.log('Error: An error occured during iteration ' + e);
-    }
+    var tileMatrixSetIdentifier = getTileMatrixSetIdentifier(
+      this.epsg,
+      capabilitiesXml,
+      resolver,
+      thisNode
+    );
 
     // Find tilematrixset:
-    
+    //not working?
+
     var iterator = capabilitiesXml.evaluate(
-        "//default:Capabilities/default:Contents/default:TileMatrixSet[child::ows:SupportedCRS[text()='urn:ogc:def:crs:EPSG::" + this.epsg + "']]/default:TileMatrix",
+      "//default:Capabilities/default:Contents/default:TileMatrixSet[child::ows:SupportedCRS[text()='urn:ogc:def:crs:EPSG::" + this.epsg + "']]/default:TileMatrix",
       capabilitiesXml,
       resolver,
       XPathResult.ANY_TYPE,
@@ -108,11 +137,12 @@ var wxs3 = wxs3 || {};
     try {
       thisNode = iterator.iterateNext();
       // Populate tileMatrixSet
+      var identifierTagName = 'Identifier';
       while (thisNode) {
         // Hack for firefox/chrome cross-compatibility
-        var identifierTagName='Identifier';
-        if (thisNode.getElementsByTagName(identifierTagName).length === 0)
-            identifierTagName='ows:Identifier'
+        if (thisNode.getElementsByTagName(identifierTagName).length === 0) {
+          identifierTagName = 'ows:Identifier';
+        }
         tileMatrixSet.push({
           TileMatrixSetIdentifier: tileMatrixSetIdentifier,
           Identifier: thisNode.getElementsByTagName(identifierTagName)[0].textContent,
@@ -121,21 +151,20 @@ var wxs3 = wxs3 || {};
             minx: parseFloat(thisNode.getElementsByTagName('TopLeftCorner')[0].textContent.split(' ')[0]),
             maxy: parseFloat(thisNode.getElementsByTagName('TopLeftCorner')[0].textContent.split(' ')[1])
           },
-          TileWidth: parseInt(thisNode.getElementsByTagName('TileWidth')[0].textContent),
-          TileHeight: parseInt(thisNode.getElementsByTagName('TileHeight')[0].textContent),
-          MatrixWidth: parseInt(thisNode.getElementsByTagName('MatrixWidth')[0].textContent),
-          MatrixHeight: parseInt(thisNode.getElementsByTagName('MatrixHeight')[0].textContent),
+          TileWidth: parseInt(thisNode.getElementsByTagName('TileWidth')[0].textContent, 10),
+          TileHeight: parseInt(thisNode.getElementsByTagName('TileHeight')[0].textContent, 10),
+          MatrixWidth: parseInt(thisNode.getElementsByTagName('MatrixWidth')[0].textContent, 10),
+          MatrixHeight: parseInt(thisNode.getElementsByTagName('MatrixHeight')[0].textContent, 10),
           // These are the two central numbers we need to calculate:
           // scaledenominator*pixelsize*tilewidth
           TileSpanX: parseFloat((thisNode.getElementsByTagName('ScaleDenominator')[0].textContent * pixelsize) * thisNode.getElementsByTagName('TileWidth')[0].textContent),
           // scaledenominator*pixelsize*tileheight
           TileSpanY: parseFloat((thisNode.getElementsByTagName('ScaleDenominator')[0].textContent * pixelsize) * thisNode.getElementsByTagName('TileHeight')[0].textContent),
-          Zoom: parseInt(thisNode.getElementsByTagName(identifierTagName)[0].textContent.split(':').slice(-1)[0]),
+          Zoom: parseInt(thisNode.getElementsByTagName(identifierTagName)[0].textContent.split(':').slice(-1)[0], 10),
         });
         thisNode = iterator.iterateNext();
       }
-    }
-    catch (e) {
+    } catch (e) {
       console.log('Error: An error occured during iteration ' + e);
     }
     return tileMatrixSet;
@@ -147,8 +176,7 @@ var wxs3 = wxs3 || {};
       // non i.e. browser
       xmlparser = new DOMParser();
       xmlDoc = xmlparser.parseFromString(xmltxt, "text/xml");
-    }
-    else {
+    } else {
       // i.e. browser
       xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
       xmlDoc.async = false;
