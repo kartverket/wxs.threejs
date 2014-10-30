@@ -1,4 +1,6 @@
-var wxs3 = wxs3 || {};
+/*jslint indent: 2*/
+/*global THREE: false, window: false */
+var wxs3 = this.wxs3 || {};
 
 (function (ns) {
   'use strict';
@@ -36,32 +38,29 @@ var wxs3 = wxs3 || {};
     for (i = 0; i < length; i++) {
       if (i < this.dim.demWidth) {
         this.edges.top.push(i);
-        if (i == 0) {
+        if (i === 0) {
           this.edges.left.push(i);
-        }
-        else if (i == this.dim.demWidth - 1) {
+        } else if (i === this.dim.demWidth - 1) {
           this.edges.right.push(i);
         }
-      }
-      else if (i >= length - this.dim.demWidth) {
+      } else if (i >= length - this.dim.demWidth) {
         this.edges.bottom.push(i);
-        if (i == length - this.dim.demWidth) {
+        if (i === length - this.dim.demWidth) {
           this.edges.left.push(i);
-        }
-        else if (i == length - 1) {
+        } else if (i === length - 1) {
           this.edges.right.push(i);
         }
+      } else if (i % this.dim.demWidth === 0) {
+        this.edges.left.push(i);
+      } else if ((i + 1) % this.dim.demWidth === 0) {
+        this.edges.right.push(i);
       }
-      else if (i % this.dim.demWidth == 0) this.edges.left.push(i);
-      else if ((i + 1) % this.dim.demWidth == 0) this.edges.right.push(i);
     }
 
-    this.edges.topLeft=this.edges.top[0];
-    this.edges.topRight=this.edges.right[0];
-    this.edges.bottomLeft=this.edges.bottom[0];
-    this.edges.bottomRight=this.edges.bottom[this.dim.demWidth-1];
-
-
+    this.edges.topLeft = this.edges.top[0];
+    this.edges.topRight = this.edges.right[0];
+    this.edges.bottomLeft = this.edges.bottom[0];
+    this.edges.bottomRight = this.edges.bottom[this.dim.demWidth - 1];
 
     this.dim.wmsLayers = layers;
     this.createRenderer();
@@ -81,12 +80,9 @@ var wxs3 = wxs3 || {};
   };
 
   ns.ThreeDMap.prototype.createRenderer = function () {
-    this.renderer = new THREE.WebGLRenderer(  
-    { 
-      //antialias: true 
-    } 
-      
-    );
+    this.renderer = new THREE.WebGLRenderer({
+      //antialias: true
+    });
     this.renderer.setSize(this.dim.width, this.dim.height);
   };
 
@@ -100,7 +96,7 @@ var wxs3 = wxs3 || {};
     var fov = 45;
     this.camera = new THREE.PerspectiveCamera(
       fov,
-        this.dim.width / this.dim.height,
+      this.dim.width / this.dim.height,
       0.1,
       5000000
     );
@@ -130,13 +126,11 @@ var wxs3 = wxs3 || {};
   ns.ThreeDMap.prototype.render = function () {
     var i;
     for (i = 0; i < this.foregroundGroup.children.length; i++) {
-      if (this.foregroundGroup.children[i].scale.z < 1 && this.foregroundGroup.children[i].geometry.loaded == true) {
+      if (this.foregroundGroup.children[i].scale.z < 1 && this.foregroundGroup.children[i].geometry.loaded === true) {
         this.foregroundGroup.children[i].scale.z += 0.02;
-
-      }
-      else if (this.foregroundGroup.children[i].scale.z >= 1) {
+      } else if (this.foregroundGroup.children[i].scale.z >= 1) {
         //this.foregroundGroup.children[i].material.wireframe=false;
-        if (this.foregroundGroup.children[i].geometry.processed['all'] == false) {
+        if (this.foregroundGroup.children[i].geometry.processed.all === false) {
           this.neighbourTest(this.foregroundGroup.children[i].WMTSCall);
         }
       }
@@ -148,12 +142,12 @@ var wxs3 = wxs3 || {};
   };
 
   ns.ThreeDMap.prototype.generateTiles = function () {
-    var capabilitiesURL = this.dim.wmtsUrl+'?Version=1.0.0&service=WMTS&request=getcapabilities';
+    var capabilitiesURL = this.dim.wmtsUrl + '?Version=1.0.0&service=WMTS&request=getcapabilities';
     var WMTSCapabilities = new ns.WMTS(capabilitiesURL, this.dim.crs, this.dim.wmtsLayer);
     var that = this;
     WMTSCapabilities.fetchCapabilities(function (tileMatrixSet) {
       that.bbox2tiles(tileMatrixSet);
-    })
+    });
   };
 
   ns.ThreeDMap.prototype.bbox2tiles = function (tileMatrixSet) {
@@ -162,19 +156,18 @@ var wxs3 = wxs3 || {};
     var WMTSCalls = [];
     var querySpanX = bounds.maxx - bounds.minx;
     var querySpanY = bounds.maxy - bounds.miny;
-    var querySpanMin, querySpanMax, querySpanMinDim, querySpanMaxDim;
+    var querySpanMin, querySpanMinDim; //, querySpanMax, querySpanMaxDim;
 
     if (querySpanX > querySpanY) {
       querySpanMin = querySpanY;
-      querySpanMax = querySpanX;
+      //querySpanMax = querySpanX;
       querySpanMinDim = 'y';
-      querySpanMaxDim = 'x';
-    }
-    else {
+      //querySpanMaxDim = 'x';
+    } else {
       querySpanMin = querySpanX;
-      querySpanMax = querySpanY;
+      //querySpanMax = querySpanY;
       querySpanMinDim = 'x';
-      querySpanMaxDim = 'y';
+      //querySpanMaxDim = 'y';
     }
     tileMatrixCount = tileMatrixSet.length;
 
@@ -182,14 +175,13 @@ var wxs3 = wxs3 || {};
     // We can control the resolution of the images by altering how large a difference there must be (half, quarter etc.)
     spanDivisor = 4;
     for (tileMatrix = 0; tileMatrix < tileMatrixCount; tileMatrix++) {
-      if (querySpanMinDim == 'x') {
+      if (querySpanMinDim === 'x') {
         if (tileMatrixSet[tileMatrix].TileSpanX < querySpanMin / spanDivisor) {
           this.foregroundMatrix = tileMatrixSet[tileMatrix];
           this.backgroundMatrix = tileMatrixSet[tileMatrix - 1];
           break;
         }
-      }
-      else if (tileMatrixSet[tileMatrix].TileSpanY < querySpanMin / spanDivisor) {
+      } else if (tileMatrixSet[tileMatrix].TileSpanY < querySpanMin / spanDivisor) {
         this.foregroundMatrix = tileMatrixSet[tileMatrix];
         this.backgroundMatrix = tileMatrixSet[tileMatrix - 1];
         break;
@@ -216,14 +208,15 @@ var wxs3 = wxs3 || {};
     var tileColMax = tileCol + 1;
     var tileRowMax = tileRow + 1;
     // Here we generate tileColumns and tileRows as well as  translate tilecol and tilerow to boundingboxes
-    for (tc = tileColMin; tc <= tileColMax; tc++)
+    for (tc = tileColMin; tc <= tileColMax; tc++) {
       for (tr = tileRowMin; tr <= tileRowMax; tr++) {
         name = activeMatrix.Zoom + '_' + tr + '_' + tc;
-        if (this.backgroundTiles.indexOf(name) == -1) {
+        if (this.backgroundTiles.indexOf(name) === -1) {
           this.backgroundTiles.push(name);
           WMTSCalls.push(this.singleTileFetcher(tc, tr, activeMatrix));
         }
       }
+    }
     return WMTSCalls;
   };
 
@@ -233,8 +226,8 @@ var wxs3 = wxs3 || {};
         activeMatrix.TopLeftCorner.minx + (tileCol * activeMatrix.TileSpanX),
         activeMatrix.TopLeftCorner.maxy - ((tileRow + 1) * activeMatrix.TileSpanY),
         activeMatrix.TopLeftCorner.minx + ((tileCol + 1) * activeMatrix.TileSpanX),
-        activeMatrix.TopLeftCorner.maxy - ((tileRow) * activeMatrix.TileSpanY)
-    ];
+        activeMatrix.TopLeftCorner.maxy - (tileRow * activeMatrix.TileSpanY)
+      ];
     var TileSpanY = activeMatrix.TileSpanY;
     var TileSpanX = activeMatrix.TileSpanX;
     var wcsDivisor = 2;
@@ -256,12 +249,12 @@ var wxs3 = wxs3 || {};
       // Setting these for easy debugging
       // TODO: define parameters here for reuse later on
       url: {
-        cache_WMTS: this.dim.wmtsUrl+'?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&Style=default&Format=image/png&Layer='+ this.dim.wmtsLayer+'&TileMatrixSet=' + activeMatrix.TileMatrixSetIdentifier + '&TileMatrix=' + activeMatrix.Identifier + '&TileRow=' + tileRow + '&TileCol=' + tileCol,
-        cache_wms: this.dim.wmscUrl +'REQUEST=GetMap&SERVICE=WMS&VERSION=1.3.0&Layer=topo2&Style=default&Format=image/png&width=256&height=256&crs=EPSG:' + activeMatrix.Identifier.split(':')[1] + '&BBOX=' + wmsBounds.join(','),
-        wms: this.dim.wmsUrl + '?GKT='+this.dim.gatekeeperTicket+'&REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&Layers='+this.dim.wmsLayers+'&Style=default&Format=image/jpeg&WIDTH=256&HEIGHT=256&SRS=EPSG:' + activeMatrix.Identifier.split(':')[1] + '&BBOX=' + wmsBounds.join(','),
+        cache_WMTS: this.dim.wmtsUrl + '?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&Style=default&Format=image/png&Layer=' + this.dim.wmtsLayer + '&TileMatrixSet=' + activeMatrix.TileMatrixSetIdentifier + '&TileMatrix=' + activeMatrix.Identifier + '&TileRow=' + tileRow + '&TileCol=' + tileCol,
+        cache_wms: this.dim.wmscUrl + 'REQUEST=GetMap&SERVICE=WMS&VERSION=1.3.0&Layer=topo2&Style=default&Format=image/png&width=256&height=256&crs=EPSG:' + activeMatrix.Identifier.split(':')[1] + '&BBOX=' + wmsBounds.join(','),
+        wms: this.dim.wmsUrl + '?GKT=' + this.dim.gatekeeperTicket + '&REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&Layers=' + this.dim.wmsLayers + '&Style=default&Format=image/jpeg&WIDTH=256&HEIGHT=256&SRS=EPSG:' + activeMatrix.Identifier.split(':')[1] + '&BBOX=' + wmsBounds.join(','),
         //wcs 1.1.0 NOT WORKING with XYZ - needs to drop xml-part to use tiff-js?
         //wcs: 'http://wcs.geonorge.no/skwms1/wcs.dtm?SERVICE=WCS&VERSION=1.1.0&REQUEST=GetCoverage&FORMAT=geotiff&IDENTIFIER=all_50m&BOUNDINGBOX='+ wcsBounds.join(',')  +',urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridBaseCRS=urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridCS=urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridType=urn:ogc:def:method:WCS:1.1:2dGridIn2dCrs&GridOrigin=' +wmsBounds[0] +',' +wmsBounds[1] +'&GridOffsets='+grid2rasterUnitsX +',' +grid2rasterUnitsY + '&RangeSubset=50m:average' //[bands[1]]'
-        wcs: this.dim.wcsUrl+'?SERVICE=WCS&VERSION=1.0.0&REQUEST=GetCoverage&FORMAT=geotiff&WIDTH=' + parseInt(dim.demWidth) + '&HEIGHT=' + parseInt(dim.demWidth) + '&COVERAGE=' + dim.coverage + '&crs=EPSG:' + this.dim.crs + '&BBOX=' + wcsBounds.join(',') // + '&INTERPOLATION=BILINEAR' //+'&RESPONSE_CRS=EPSG:'+activeMatrix.Identifier.split(':')[1] //+ '&RangeSubset=50m:average[bands[1]]' +'&RESX='+grid2rasterUnitsX+'&RESY='+grid2rasterUnitsY
+        wcs: this.dim.wcsUrl + '?SERVICE=WCS&VERSION=1.0.0&REQUEST=GetCoverage&FORMAT=geotiff&WIDTH=' + parseInt(this.dim.demWidth, 10) + '&HEIGHT=' + parseInt(this.dim.demWidth, 10) + '&COVERAGE=' + this.dim.coverage + '&crs=EPSG:' + this.dim.crs + '&BBOX=' + wcsBounds.join(',') // + '&INTERPOLATION=BILINEAR' //+'&RESPONSE_CRS=EPSG:'+activeMatrix.Identifier.split(':')[1] //+ '&RangeSubset=50m:average[bands[1]]' +'&RESX='+grid2rasterUnitsX+'&RESY='+grid2rasterUnitsY
       },
       bounds: {
         minx: wmsBounds[0],
@@ -311,15 +304,17 @@ var wxs3 = wxs3 || {};
     var tileColMax = tileCol + 1;
     var tileRowMax = tileRow + 1;
     // Here we generate tileColumns and tileRows as well as  translate tilecol and tilerow to boundingboxes
-    for (tc = tileColMin; tc <= tileColMax; tc++)
-      for (tr = tileRowMin; tr <= tileRowMax; tr++)
+    for (tc = tileColMin; tc <= tileColMax; tc++) {
+      for (tr = tileRowMin; tr <= tileRowMax; tr++) {
         //if (this.foregroundTiles.indexOf(name.zoom+'_'+tr+'_'+tc) ==-1) {
-        if (typeof this.foregroundGroup.getObjectByName(tileName.zoom + '_' + tr + '_' + tc) === "undefined") {
+        if (this.foregroundGroup.getObjectByName(tileName.zoom + '_' + tr + '_' + tc) === undefined) {
           // Add tile to index over loaded tiles
           // TODO: Do we still use this?
           this.foregroundTiles.push((tileName.zoom + 1) + '_' + tr + '_' + tc);
           WMTSCalls.push(this.singleTileFetcher(tc, tr, this.foregroundMatrix));
         }
+      }
+    }
     return WMTSCalls;
   };
 
@@ -333,19 +328,21 @@ var wxs3 = wxs3 || {};
     var tileColMax = tileCol + 1;
     var tileRowMax = tileRow + 1;
     // Here we generate tileColumns and tileRows as well as  translate tilecol and tilerow to boundingboxes
-    for (tc = tileColMin; tc <= tileColMax; tc++)
-      for (tr = tileRowMin; tr <= tileRowMax; tr++){
+    for (tc = tileColMin; tc <= tileColMax; tc++) {
+      for (tr = tileRowMin; tr <= tileRowMax; tr++) {
       // TODO: Why do we still use this instead of backgroundGroup.getObjectByName()
-      if (this.backgroundTiles.indexOf(tileName.zoom + '_' + tr + '_' + tc) == -1) {
+        if (this.backgroundTiles.indexOf(tileName.zoom + '_' + tr + '_' + tc) === -1) {
           this.backgroundTiles.push(tileName.zoom + '_' + tr + '_' + tc);
           WMTSCalls.push(this.singleTileFetcher(tc, tr, this.backgroundMatrix));
         }
       }
+    }
     return WMTSCalls;
   };
 
   ns.ThreeDMap.prototype.tileLoader = function (WMTSCalls, visible) {
     var WCSTile, concatName, geometry, material, i;
+    var activeUrl;
     for (i = 0; i < WMTSCalls.length; i++) {
       material = null;
       geometry = null;
@@ -354,7 +351,7 @@ var wxs3 = wxs3 || {};
         // Hack for CORS?
         THREE.ImageUtils.crossOrigin = "";
 
-        WCSTile = new ns.WCS(WMTSCalls[i].tileSpanX, WMTSCalls[i].tileSpanY, dim.demWidth - 1, dim.demHeight - 1);
+        WCSTile = new ns.WCS(WMTSCalls[i].tileSpanX, WMTSCalls[i].tileSpanY, this.dim.demWidth - 1, this.dim.demHeight - 1);
         WCSTile.wcsFetcher(WMTSCalls[i]);
         geometry = WCSTile.geometry;
         geometry.processed = {
@@ -370,16 +367,16 @@ var wxs3 = wxs3 || {};
           all: false
         };
 
-        var activeUrl;
-        if (this.dim.wmsUrl)
-          activeUrl=WMTSCalls[i].url.wms;
-        else
-          activeUrl=WMTSCalls[i].url.cache_WMTS;
 
+        if (this.dim.wmsUrl) {
+          activeUrl = WMTSCalls[i].url.wms;
+        } else {
+          activeUrl = WMTSCalls[i].url.cache_WMTS;
+        }
         // TODO: Create a loader for images based on the WCS-loader. This allows us to check if the image actually loads and reload if something fails. Also, we can use wireframes as a placeholder.
         material = new THREE.MeshBasicMaterial(
           {
-            
+
             map: THREE.ImageUtils.loadTexture(
               activeUrl,
               new THREE.UVMapping()
@@ -391,8 +388,7 @@ var wxs3 = wxs3 || {};
         );
         //material.depthWrite=false;
         //material.map.image.hidden=true;
-      }
-      else {
+      } else {
         geometry = new THREE.PlaneGeometry(WMTSCalls[i].tileSpanX, WMTSCalls[i].tileSpanY);
         material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
       }
@@ -420,87 +416,99 @@ var wxs3 = wxs3 || {};
     tile.visible = visible;
     if (visible) {
       this.foregroundGroup.add(tile);
-    }
-    else {
+    } else {
       this.backgroundGroup.add(tile);
     }
   };
 
   ns.ThreeDMap.prototype.neighbourTest = function (WMTSCall) {
     var name = WMTSCall.zoom + '_' + (WMTSCall.tileRow) + '_' + WMTSCall.tileCol;
-    var neighbours={
+    var neighbours = {
       top: WMTSCall.zoom + '_' + (WMTSCall.tileRow - 1) + '_' + WMTSCall.tileCol,
       bottom: WMTSCall.zoom + '_' + (WMTSCall.tileRow + 1) + '_' + WMTSCall.tileCol,
       left: WMTSCall.zoom + '_' + WMTSCall.tileRow + '_' + (WMTSCall.tileCol - 1),
       right: WMTSCall.zoom + '_' + WMTSCall.tileRow + '_' + (WMTSCall.tileCol + 1),
-      topLeft: WMTSCall.zoom+'_'+ (WMTSCall.tileRow -1) +'_'+(WMTSCall.tileCol -1),
-      topRight: WMTSCall.zoom+'_'+ (WMTSCall.tileRow -1) +'_'+ (WMTSCall.tileCol +1),
-      bottomLeft: WMTSCall.zoom+'_'+ (WMTSCall.tileRow +1) +'_'+(WMTSCall.tileCol -1),
-      bottomRight: WMTSCall.zoom+'_'+ (WMTSCall.tileRow +1) +'_'+(WMTSCall.tileCol +1)
-   }
-     
+      topLeft: WMTSCall.zoom + '_' + (WMTSCall.tileRow - 1) + '_' + (WMTSCall.tileCol - 1),
+      topRight: WMTSCall.zoom + '_' + (WMTSCall.tileRow - 1) + '_' + (WMTSCall.tileCol + 1),
+      bottomLeft: WMTSCall.zoom + '_' + (WMTSCall.tileRow + 1) + '_' + (WMTSCall.tileCol - 1),
+      bottomRight: WMTSCall.zoom + '_' + (WMTSCall.tileRow + 1) + '_' + (WMTSCall.tileCol + 1)
+    };
+
     var tile = this.foregroundGroup.getObjectByName(name);
     // If the tile is already processed on edges we skip
-    if(!tile.geometry.processed['allSides']){
-      if (!tile.geometry.processed['top']){
-        this.geometryEdgeTester(tile, neighbours['top'], 'top');
+    if (!tile.geometry.processed.allSides) {
+      if (!tile.geometry.processed.top) {
+        this.geometryEdgeTester(tile, neighbours.top, 'top');
       }
-      if (!tile.geometry.processed['bottom']){
-        this.geometryEdgeTester(tile, neighbours['bottom'], 'bottom');
+      if (!tile.geometry.processed.bottom) {
+        this.geometryEdgeTester(tile, neighbours.bottom, 'bottom');
       }
-      if (!tile.geometry.processed['left']){
-        this.geometryEdgeTester(tile, neighbours['left'], 'left');
+      if (!tile.geometry.processed.left) {
+        this.geometryEdgeTester(tile, neighbours.left, 'left');
       }
-      if (!tile.geometry.processed['right']){
-        this.geometryEdgeTester(tile, neighbours['right'], 'right');
+      if (!tile.geometry.processed.right) {
+        this.geometryEdgeTester(tile, neighbours.right, 'right');
       }
-    }
-    // Test if neighbours are loaded
-    else
-    {
-      if (!tile.geometry.processed['topLeft']){
-        this.geometryCornerTester(tile,
-          [ neighbours['topLeft'],
-            neighbours['left'],
-            neighbours['top']
+    } else { // Test if neighbours are loaded
+      if (!tile.geometry.processed.topLeft) {
+        this.geometryCornerTester(
+          tile,
+          [
+            neighbours.topLeft,
+            neighbours.left,
+            neighbours.top
           ],
-          [ 'topLeft',
+          [
+            'topLeft',
             'left',
             'top'
-          ]);
+          ]
+        );
       }
-      if (!tile.geometry.processed['bottomLeft']){
-        this.geometryCornerTester(tile,
-          [ neighbours['bottomLeft'],
-            neighbours['left'],
-            neighbours['bottom']
+      if (!tile.geometry.processed.bottomLeft) {
+        this.geometryCornerTester(
+          tile,
+          [
+            neighbours.bottomLeft,
+            neighbours.left,
+            neighbours.bottom
           ],
-          [ 'bottomLeft',
+          [
+            'bottomLeft',
             'left',
             'bottom'
-          ]);
+          ]
+        );
       }
-      if (!tile.geometry.processed['bottomRight']){
-        this.geometryCornerTester(tile,
-          [ neighbours['bottomRight'],
-            neighbours['right'],
-            neighbours['bottom']
+      if (!tile.geometry.processed.bottomRight) {
+        this.geometryCornerTester(
+          tile,
+          [
+            neighbours.bottomRight,
+            neighbours.right,
+            neighbours.bottom
           ],
-          [ 'bottomRight',
+          [
+            'bottomRight',
             'right',
             'bottom'
-          ]);
+          ]
+        );
       }
-      if (!tile.geometry.processed['topRight']){
-        this.geometryCornerTester(tile,
-          [ neighbours['topRight'],
-            neighbours['right'],
-            neighbours['top']
+      if (!tile.geometry.processed.topRight) {
+        this.geometryCornerTester(
+          tile,
+          [
+            neighbours.topRight,
+            neighbours.right,
+            neighbours.top
           ],
-          [ 'topRight',
+          [
+            'topRight',
             'right',
             'top'
-          ]);
+          ]
+        );
       }
 
     }
@@ -510,12 +518,12 @@ var wxs3 = wxs3 || {};
     var neighbour; //, tile;
     if (this.foregroundGroup.getObjectByName(neighbourName)) {
       neighbour = this.foregroundGroup.getObjectByName(neighbourName);
-      if (neighbour.geometry.loaded == true && neighbour.scale.z >= 1) {
-        if (tile.geometry.loaded == true) {
+      if (neighbour.geometry.loaded === true && neighbour.scale.z >= 1) {
+        if (tile.geometry.loaded === true) {
           this.geometryEdgeFixer(tile, neighbour, placement);
         }
       }
-      
+
     }
   };
 
@@ -523,7 +531,7 @@ var wxs3 = wxs3 || {};
   ns.ThreeDMap.prototype.geometryEdgeFixer = function (tile, neighbour, placement) {
     var i, oppositeEdge;
     // Edges
-    oppositeEdge ={
+    oppositeEdge = {
       top: 'bottom',
       bottom: 'top',
       left: 'right',
@@ -532,7 +540,7 @@ var wxs3 = wxs3 || {};
       bottomRight: 'topLeft',
       topRight: 'bottomLeft',
       bottomLeft: 'topRight'
-    }
+    };
 
     for (i = 0; i < this.edges[placement].length; i++) {
       tile.geometry.vertices[this.edges[placement][i]].z = (tile.geometry.vertices[this.edges[placement][i]].z + neighbour.geometry.vertices[this.edges[oppositeEdge[placement]][i]].z) / 2;
@@ -542,43 +550,49 @@ var wxs3 = wxs3 || {};
     neighbour.geometry.verticesNeedUpdate = true;
     tile.geometry.processed[placement] = true;
     neighbour.geometry.processed[oppositeEdge[placement]] = true;
-    if (tile.geometry.processed['top'] & tile.geometry.processed['bottom'] & tile.geometry.processed['left'] & tile.geometry.processed['right'] ){
-      tile.geometry.processed['allSides'] = true;
-      if ( tile.geometry.processed['topLeft'] & tile.geometry.processed['bottomLeft'] & tile.geometry.processed['bottomRight'] & tile.geometry.processed['topRight'] )
-        tile.geometry.processed['all'] = true;
+    if (tile.geometry.processed.top && tile.geometry.processed.bottom && tile.geometry.processed.left && tile.geometry.processed.right) {
+      tile.geometry.processed.allSides = true;
+      if (tile.geometry.processed.topLeft && tile.geometry.processed.bottomLeft && tile.geometry.processed.bottomRight && tile.geometry.processed.topRight) {
+        tile.geometry.processed.all = true;
+      }
     }
-    if (neighbour.geometry.processed['top'] & neighbour.geometry.processed['bottom'] & neighbour.geometry.processed['left'] & neighbour.geometry.processed['right'] ){
-      neighbour.geometry.processed['allSides'] = true;
-      if (neighbour.geometry.processed['topLeft'] & neighbour.geometry.processed['bottomLeft'] & neighbour.geometry.processed['bottomRight'] & neighbour.geometry.processed['topRight'] )
-        neighbour.geometry.processed['all'] = true;
+    if (neighbour.geometry.processed.top && neighbour.geometry.processed.bottom && neighbour.geometry.processed.left && neighbour.geometry.processed.right) {
+      neighbour.geometry.processed.allSides = true;
+      if (neighbour.geometry.processed.topLeft && neighbour.geometry.processed.bottomLeft && neighbour.geometry.processed.bottomRight && neighbour.geometry.processed.topRight) {
+        neighbour.geometry.processed.all = true;
+      }
     }
   };
 
 
-    ns.ThreeDMap.prototype.geometryCornerTester = function (tile, neighbourNames, placements) {
+  ns.ThreeDMap.prototype.geometryCornerTester = function (tile, neighbourNames, placements) {
     var neighbour; //, tile;
-    var neighbours=[];
-    if (tile.geometry.loaded == true) {
-      for (var i in placements){
+    var neighbours = [];
+    var i;
+    if (tile.geometry.loaded === true) {
+      for (i in placements) {
+        if (placements.hasOwnProperty(i)) {
           if (this.foregroundGroup.getObjectByName(neighbourNames[i])) {
-            var neighbour=this.foregroundGroup.getObjectByName(neighbourNames[i]);
+            neighbour = this.foregroundGroup.getObjectByName(neighbourNames[i]);
             // Populate array with neighbour
-            if (neighbour.geometry.loaded == true && neighbour.scale.z >= 1) {
+            if (neighbour.geometry.loaded === true && neighbour.scale.z >= 1) {
               neighbours.push(neighbour);
+            }
           }
         }
       }
     }
     // Check to see if we have all neighbours
-    if(neighbours.length==3)
+    if (neighbours.length === 3) {
       this.geometryCornerFixer(tile, neighbours, placements);
+    }
   };
 
-    ns.ThreeDMap.prototype.geometryCornerFixer = function (tile, neighbours, placements) {
+  ns.ThreeDMap.prototype.geometryCornerFixer = function (tile, neighbours, placements) {
     // Index to invert corners
     // TODO: This is not very easy to read. Might need a better solution
     // TODO: This is constant and should be defined only once
-    var oppositeCorners={
+    var oppositeCorners = {
       topLeft: {
         topLeft: 'bottomRight',
         left: 'topRight',
@@ -587,7 +601,7 @@ var wxs3 = wxs3 || {};
       bottomRight: {
         bottomRight: 'topLeft',
         right: 'bottomLeft',
-        bottom:'topRight'
+        bottom: 'topRight'
       },
       topRight: {
         topRight: 'bottomLeft',
@@ -599,53 +613,56 @@ var wxs3 = wxs3 || {};
         left: 'bottomRight',
         bottom: 'topLeft'
       }
-    }
+    };
 
     // Calculate average height
-    var averageHeightCorner=
+    var averageHeightCorner =
       (
-      tile.geometry.vertices[this.edges[placements[0]]].z +
-      neighbours[0].geometry.vertices[this.edges[
-      oppositeCorners[placements[0]][placements[0]]
-      ]].z +
-      neighbours[1].geometry.vertices[this.edges[
-      oppositeCorners[placements[0]][placements[1]]
-      ]].z +
-      neighbours[2].geometry.vertices[this.edges[
-      oppositeCorners[placements[0]][placements[2]]
-      ]].z
-      ) /4;
+        tile.geometry.vertices[this.edges[placements[0]]].z +
+        neighbours[0].geometry.vertices[this.edges[
+            oppositeCorners[placements[0]][placements[0]]
+          ]].z +
+        neighbours[1].geometry.vertices[this.edges[
+            oppositeCorners[placements[0]][placements[1]]
+          ]].z +
+        neighbours[2].geometry.vertices[this.edges[
+            oppositeCorners[placements[0]][placements[2]]
+          ]].z
+      ) / 4;
 
     // Set vertex on tile and neighbours to average value
-    tile.geometry.vertices[this.edges[placements[0]]].z=averageHeightCorner;
+    tile.geometry.vertices[this.edges[placements[0]]].z = averageHeightCorner;
     neighbours[0].geometry.vertices[this.edges[
-    oppositeCorners[placements[0]][placements[0]]
-    ]].z=averageHeightCorner;
+      oppositeCorners[placements[0]][placements[0]]
+    ]].z = averageHeightCorner;
     neighbours[1].geometry.vertices[this.edges[
-    oppositeCorners[placements[0]][placements[1]]
-    ]].z=averageHeightCorner;
+      oppositeCorners[placements[0]][placements[1]]
+    ]].z = averageHeightCorner;
     neighbours[2].geometry.vertices[this.edges[
-    oppositeCorners[placements[0]][placements[2]]
-    ]].z=averageHeightCorner;
+      oppositeCorners[placements[0]][placements[2]]
+    ]].z = averageHeightCorner;
 
     // Flag for update
-    tile.geometry.verticesNeedUpdate=true;
-    neighbours[0].geometry.verticesNeedUpdate=true;
-    neighbours[1].geometry.verticesNeedUpdate=true;
-    neighbours[2].geometry.verticesNeedUpdate=true;
+    tile.geometry.verticesNeedUpdate = true;
+    neighbours[0].geometry.verticesNeedUpdate = true;
+    neighbours[1].geometry.verticesNeedUpdate = true;
+    neighbours[2].geometry.verticesNeedUpdate = true;
 
     // Flag corners as processed
-    tile.geometry.processed[placements[0]]=true;
-    neighbours[0].geometry.processed[oppositeCorners[placements[0]][placements[0]]]=true;
-    neighbours[1].geometry.processed[oppositeCorners[placements[0]][placements[1]]]=true;
-    neighbours[2].geometry.processed[oppositeCorners[placements[0]][placements[2]]]=true;
+    tile.geometry.processed[placements[0]] = true;
+    neighbours[0].geometry.processed[oppositeCorners[placements[0]][placements[0]]] = true;
+    neighbours[1].geometry.processed[oppositeCorners[placements[0]][placements[1]]] = true;
+    neighbours[2].geometry.processed[oppositeCorners[placements[0]][placements[2]]] = true;
 
     // Check if all corners are averaged and flag if so
-    if ( tile.geometry.processed['topLeft'] & tile.geometry.processed['bottomLeft'] & tile.geometry.processed['bottomRight'] & tile.geometry.processed['topRight'] )
-      tile.geometry.processed['all'] = true;
-    for (var i =0; i<3;i++){
-      if (neighbours[i].geometry.processed['topLeft'] & neighbours[i].geometry.processed['bottomLeft'] & neighbours[i].geometry.processed['bottomRight'] & neighbours[i].geometry.processed['topRight'] )
-        neighbours[i].geometry.processed['all'] = true;
+    if (tile.geometry.processed.topLeft && tile.geometry.processed.bottomLeft && tile.geometry.processed.bottomRight && tile.geometry.processed.topRight) {
+      tile.geometry.processed.all = true;
+      var i;
+      for (i = 0; i < 3; i++) {
+        if (neighbours[i].geometry.processed.topLeft && neighbours[i].geometry.processed.bottomLeft && neighbours[i].geometry.processed.bottomRight && neighbours[i].geometry.processed.topRight) {
+          neighbours[i].geometry.processed.all = true;
+        }
+      }
     }
-  }
+  };
 }(wxs3));

@@ -1,4 +1,4 @@
-/*global WMTSCall: false, XMLHttpRequest: false, TIFFParser: false, console: false, THREE: false, Uint8Array: false, WSH: false */
+/*global WMTSCall: false, XMLHttpRequest: false, TIFFParser: false, console: false, THREE: false, Uint8Array: false, WSH: false, window: false */
 /*jslint indent: 2*/
 
 var wxs3 = this.wxs3 || {};

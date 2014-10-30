@@ -1,5 +1,5 @@
 /*jslint indent: 2*/
-/*global wxs3: false */
+/*global wxs3: false, window: false */
 
 // extraction for URL parameters
 function getQueryVariable(variable) {
@@ -75,7 +75,7 @@ var Dim = {
   wcsUrl: getQueryVariable("WCS") || 'http://wms.geonorge.no/skwms1/wcs.dtm',
   wmsFormat: getQueryVariable("WMSFORMAT") || "image/png",
   wmsFormatMode: "",
-  gatekeeperTicket: getQueryVariable("GKT")||false,
+  gatekeeperTicket: getQueryVariable("GKT") || false,
   zMult: getQueryVariable("ZMULT") || 1
 };
 

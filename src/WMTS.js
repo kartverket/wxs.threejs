@@ -1,4 +1,4 @@
-/*global XMLHttpRequest: false, XPathResult: false, DOMParser: false, ActiveXObject: false */
+/*global XMLHttpRequest: false, XPathResult: false, DOMParser: false, ActiveXObject: false, window: false */
 /*jslint indent: 2*/
 
 var wxs3 = this.wxs3 || {};
@@ -29,7 +29,7 @@ var wxs3 = this.wxs3 || {};
     client.send();
   };
 
-
+  /*
   function getTileMatrixSetLinks(layer, capabilitiesXml, resolver, thisNode) {
     var tileMatrixSetLinks = [];
 
@@ -54,6 +54,7 @@ var wxs3 = this.wxs3 || {};
     }
     return tileMatrixSetLinks;
   }
+  */
 
 
   function getTileMatrixSetIdentifier(epsg, capabilitiesXml, resolver, thisNode) {
@@ -87,7 +88,7 @@ var wxs3 = this.wxs3 || {};
     // TODO: Figure out correct number for geographic projections
     var pixelsize = 0.00028;
 
-    // Hacky namespace-resolver to read default namespace. suggestions welcome   
+    // Hacky namespace-resolver to read default namespace. suggestions welcome
     var resolver = {
       lookupNamespaceURI: function lookup(aPrefix) {
         if (aPrefix === "default") {
@@ -99,13 +100,14 @@ var wxs3 = this.wxs3 || {};
       }
     };
 
-
+    /*
     var tileMatrixSetLinks = getTileMatrixSetLinks(
       this.layer,
       capabilitiesXml,
       resolver,
       thisNode
     );
+    */
 
     var tileMatrixSetIdentifier = getTileMatrixSetIdentifier(
       this.epsg,
