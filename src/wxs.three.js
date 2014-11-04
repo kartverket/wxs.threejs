@@ -421,96 +421,65 @@ var wxs3 = this.wxs3 || {};
     }
   };
 
+  function join() {
+    return Array.prototype.slice.call(arguments).join('_');
+  }
+
+  ns.ThreeDMap.prototype.testTile = function (tile, neighbours, side) {
+    if (!tile.geometry.processed[side]) {
+      this.geometryEdgeTester(tile, neighbours[side], side);
+    }
+  };
+
   ns.ThreeDMap.prototype.neighbourTest = function (WMTSCall) {
-    var name = WMTSCall.zoom + '_' + (WMTSCall.tileRow) + '_' + WMTSCall.tileCol;
+    var name = join(WMTSCall.zoom, WMTSCall.tileRow, WMTSCall.tileCol);
     var neighbours = {
-      top: WMTSCall.zoom + '_' + (WMTSCall.tileRow - 1) + '_' + WMTSCall.tileCol,
-      bottom: WMTSCall.zoom + '_' + (WMTSCall.tileRow + 1) + '_' + WMTSCall.tileCol,
-      left: WMTSCall.zoom + '_' + WMTSCall.tileRow + '_' + (WMTSCall.tileCol - 1),
-      right: WMTSCall.zoom + '_' + WMTSCall.tileRow + '_' + (WMTSCall.tileCol + 1),
-      topLeft: WMTSCall.zoom + '_' + (WMTSCall.tileRow - 1) + '_' + (WMTSCall.tileCol - 1),
-      topRight: WMTSCall.zoom + '_' + (WMTSCall.tileRow - 1) + '_' + (WMTSCall.tileCol + 1),
-      bottomLeft: WMTSCall.zoom + '_' + (WMTSCall.tileRow + 1) + '_' + (WMTSCall.tileCol - 1),
-      bottomRight: WMTSCall.zoom + '_' + (WMTSCall.tileRow + 1) + '_' + (WMTSCall.tileCol + 1)
+      top: join(WMTSCall.zoom, (WMTSCall.tileRow - 1), WMTSCall.tileCol),
+      bottom: join(WMTSCall.zoom, (WMTSCall.tileRow + 1), WMTSCall.tileCol),
+      left: join(WMTSCall.zoom, WMTSCall.tileRow, (WMTSCall.tileCol - 1)),
+      right: join(WMTSCall.zoom, WMTSCall.tileRow, (WMTSCall.tileCol + 1)),
+      topLeft: join(WMTSCall.zoom, (WMTSCall.tileRow - 1), (WMTSCall.tileCol - 1)),
+      topRight: join(WMTSCall.zoom, (WMTSCall.tileRow - 1), (WMTSCall.tileCol + 1)),
+      bottomLeft: join(WMTSCall.zoom, (WMTSCall.tileRow + 1), (WMTSCall.tileCol - 1)),
+      bottomRight: join(WMTSCall.zoom, (WMTSCall.tileRow + 1), (WMTSCall.tileCol + 1))
     };
 
     var tile = this.foregroundGroup.getObjectByName(name);
     // If the tile is already processed on edges we skip
     if (!tile.geometry.processed.allSides) {
-      if (!tile.geometry.processed.top) {
-        this.geometryEdgeTester(tile, neighbours.top, 'top');
-      }
-      if (!tile.geometry.processed.bottom) {
-        this.geometryEdgeTester(tile, neighbours.bottom, 'bottom');
-      }
-      if (!tile.geometry.processed.left) {
-        this.geometryEdgeTester(tile, neighbours.left, 'left');
-      }
-      if (!tile.geometry.processed.right) {
-        this.geometryEdgeTester(tile, neighbours.right, 'right');
-      }
+      this.testTile(tile, neighbours, 'top');
+      this.testTile(tile, neighbours, 'bottom');
+      this.testTile(tile, neighbours, 'left');
+      this.testTile(tile, neighbours, 'right');
     } else { // Test if neighbours are loaded
       if (!tile.geometry.processed.topLeft) {
         this.geometryCornerTester(
           tile,
-          [
-            neighbours.topLeft,
-            neighbours.left,
-            neighbours.top
-          ],
-          [
-            'topLeft',
-            'left',
-            'top'
-          ]
+          neighbours,
+          ['topLeft', 'left', 'top']
         );
       }
       if (!tile.geometry.processed.bottomLeft) {
         this.geometryCornerTester(
           tile,
-          [
-            neighbours.bottomLeft,
-            neighbours.left,
-            neighbours.bottom
-          ],
-          [
-            'bottomLeft',
-            'left',
-            'bottom'
-          ]
+          neighbours,
+          ['bottomLeft', 'left', 'bottom']
         );
       }
       if (!tile.geometry.processed.bottomRight) {
         this.geometryCornerTester(
           tile,
-          [
-            neighbours.bottomRight,
-            neighbours.right,
-            neighbours.bottom
-          ],
-          [
-            'bottomRight',
-            'right',
-            'bottom'
-          ]
+          neighbours,
+          ['bottomRight', 'right', 'bottom']
         );
       }
       if (!tile.geometry.processed.topRight) {
         this.geometryCornerTester(
           tile,
-          [
-            neighbours.topRight,
-            neighbours.right,
-            neighbours.top
-          ],
-          [
-            'topRight',
-            'right',
-            'top'
-          ]
+          neighbours,
+          ['topRight', 'right', 'top']
         );
       }
-
     }
   };
 
@@ -527,6 +496,25 @@ var wxs3 = this.wxs3 || {};
     }
   };
 
+
+  function sidesProcessed(tile) {
+    var p = tile.geometry.processed;
+    return (p.top && p.bottom && p.left && p.right);
+  }
+
+  function allSidesProcessed(tile) {
+    var p = tile.geometry.processed;
+    return (p.topLeft && p.bottomLeft && p.bottomRight && p.topRight);
+  }
+
+  function checkTileProcessed(tile) {
+    if (sidesProcessed(tile)) {
+      tile.geometry.processed.allSides = true;
+      if (allSidesProcessed(tile)) {
+        tile.geometry.processed.all = true;
+      }
+    }
+  }
 
   ns.ThreeDMap.prototype.geometryEdgeFixer = function (tile, neighbour, placement) {
     var i, oppositeEdge;
@@ -550,35 +538,27 @@ var wxs3 = this.wxs3 || {};
     neighbour.geometry.verticesNeedUpdate = true;
     tile.geometry.processed[placement] = true;
     neighbour.geometry.processed[oppositeEdge[placement]] = true;
-    if (tile.geometry.processed.top && tile.geometry.processed.bottom && tile.geometry.processed.left && tile.geometry.processed.right) {
-      tile.geometry.processed.allSides = true;
-      if (tile.geometry.processed.topLeft && tile.geometry.processed.bottomLeft && tile.geometry.processed.bottomRight && tile.geometry.processed.topRight) {
-        tile.geometry.processed.all = true;
-      }
-    }
-    if (neighbour.geometry.processed.top && neighbour.geometry.processed.bottom && neighbour.geometry.processed.left && neighbour.geometry.processed.right) {
-      neighbour.geometry.processed.allSides = true;
-      if (neighbour.geometry.processed.topLeft && neighbour.geometry.processed.bottomLeft && neighbour.geometry.processed.bottomRight && neighbour.geometry.processed.topRight) {
-        neighbour.geometry.processed.all = true;
-      }
-    }
+
+    checkTileProcessed(tile);
+    checkTileProcessed(neighbour);
   };
 
 
-  ns.ThreeDMap.prototype.geometryCornerTester = function (tile, neighbourNames, placements) {
-    var neighbour; //, tile;
+  ns.ThreeDMap.prototype.geometryCornerTester = function (tile, orgNeighbours, placements) {
+    if (!tile.geometry.loaded) {
+      return;
+    }
+
     var neighbours = [];
+    var neighbour;
     var i;
-    if (tile.geometry.loaded === true) {
-      for (i in placements) {
-        if (placements.hasOwnProperty(i)) {
-          if (this.foregroundGroup.getObjectByName(neighbourNames[i])) {
-            neighbour = this.foregroundGroup.getObjectByName(neighbourNames[i]);
-            // Populate array with neighbour
-            if (neighbour.geometry.loaded === true && neighbour.scale.z >= 1) {
-              neighbours.push(neighbour);
-            }
-          }
+    var key;
+    for (i in placements) {
+      if (placements.hasOwnProperty(i)) {
+        key = placements[i];
+        neighbour = this.foregroundGroup.getObjectByName(orgNeighbours[key]);
+        if (neighbour && neighbour.geometry.loaded && neighbour.scale.z >= 1) {
+          neighbours.push(neighbour);
         }
       }
     }
@@ -655,11 +635,11 @@ var wxs3 = this.wxs3 || {};
     neighbours[2].geometry.processed[oppositeCorners[placements[0]][placements[2]]] = true;
 
     // Check if all corners are averaged and flag if so
-    if (tile.geometry.processed.topLeft && tile.geometry.processed.bottomLeft && tile.geometry.processed.bottomRight && tile.geometry.processed.topRight) {
+    if (allSidesProcessed(tile)) {
       tile.geometry.processed.all = true;
       var i;
       for (i = 0; i < 3; i++) {
-        if (neighbours[i].geometry.processed.topLeft && neighbours[i].geometry.processed.bottomLeft && neighbours[i].geometry.processed.bottomRight && neighbours[i].geometry.processed.topRight) {
+        if (allSidesProcessed(neighbours[i])) {
           neighbours[i].geometry.processed.all = true;
         }
       }
