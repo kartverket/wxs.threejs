@@ -55,6 +55,30 @@ var wxs3 = this.wxs3 || {};
   }
 
 
+  function getNeighbourNames(zoom, tileRow, tileCol) {
+    var row;
+    var col;
+    var i = 0;
+    var pos = [
+      'topLeft', 'top', 'topRight',
+      'left', null, 'right',
+      'bottomLeft', 'bottom', 'bottomRight',
+    ];
+    var name;
+    var neighbours = {};
+    for (row = -1; row <= 1; row++) {
+      for (col = -1; col <= 1; col++) {
+        name = pos[i];
+        if (name) {
+          neighbours[name] = getTileName(zoom, tileRow + row, tileCol + col);
+        }
+        i++;
+      }
+    }
+    return neighbours;
+  }
+
+
   ns.ThreeDMap = function (layers, dim) {
     var i, length;
     this.dim = dim;
@@ -231,8 +255,12 @@ var wxs3 = this.wxs3 || {};
     }
     tileMatrixCount = tileMatrixSet.length;
 
-    // Here we find the first matrix that has a tilespan smaller than that of the smallest dimension of the input bbox.
-    // We can control the resolution of the images by altering how large a difference there must be (half, quarter etc.)
+    /*
+    Here we find the first matrix that has a tilespan smaller than that of
+    the smallest dimension of the input bbox.
+    We can control the resolution of the images by altering how large a
+    difference there must be (half, quarter etc.)
+    */
     spanDivisor = 4;
     var obj;
     for (tileMatrix = 0; tileMatrix < tileMatrixCount; tileMatrix++) {
@@ -287,29 +315,6 @@ var wxs3 = this.wxs3 || {};
     }
     return WMTSCalls;
   };
-
-  function getNeighbourNames(zoom, tileRow, tileCol) {
-    var row;
-    var col;
-    var i = 0;
-    var pos = [
-      'topLeft', 'top', 'topRight',
-      'left', null, 'right',
-      'bottomLeft', 'bottom', 'bottomRight',
-    ];
-    var name;
-    var neighbours = {};
-    for (row = -1; row <= 1; row++) {
-      for (col = -1; col <= 1; col++) {
-        name = pos[i];
-        if (name) {
-          neighbours[name] = getTileName(zoom, tileRow + row, tileCol + col);
-        }
-        i++;
-      }
-    }
-    return neighbours;
-  }
 
   ns.ThreeDMap.prototype.singleTileFetcher = function (tileCol, tileRow, activeMatrix) {
     var WMTSCall;
@@ -436,7 +441,7 @@ var wxs3 = this.wxs3 || {};
     // remove processed background
     // TODO: Find out if we need to run geometry.dispose() first.
     var obj = this.backgroundGroup.getObjectByName(
-      join(tileName.zoom, tileName.tileRow, tileName.tileCol)
+      getTileName(tileName.zoom, tileName.tileRow, tileName.tileCol)
     );
     obj.geometry.dispose();
     this.backgroundGroup.remove(obj);
@@ -628,15 +633,12 @@ var wxs3 = this.wxs3 || {};
   };
 
   ns.ThreeDMap.prototype.geometryEdgeTester = function (tile, neighbourName, placement) {
-    var neighbour; //, tile;
-    if (this.foregroundGroup.getObjectByName(neighbourName)) {
-      neighbour = this.foregroundGroup.getObjectByName(neighbourName);
-      if (neighbour.geometry.loaded === true && neighbour.scale.z >= 1) {
-        if (tile.geometry.loaded === true) {
-          this.geometryEdgeFixer(tile, neighbour, placement);
-        }
-      }
-
+    var neighbour = this.foregroundGroup.getObjectByName(neighbourName);
+    if (!neighbour) {
+        return;
+    }
+    if (neighbour.geometry.loaded && neighbour.scale.z >= 1 && tile.geometry.loaded) {
+        this.geometryEdgeFixer(tile, neighbour, placement);
     }
   };
 
