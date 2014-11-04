@@ -5,6 +5,56 @@ var wxs3 = this.wxs3 || {};
 (function (ns) {
   'use strict';
 
+
+  function join() {
+    return Array.prototype.slice.call(arguments).join('_');
+  }
+
+
+  function getTileName(zoom, row, col) {
+    return join(zoom, row, col);
+  }
+
+
+  function avg(a, b) {
+    return (a + b) / 2;
+  }
+
+
+  function sidesProcessed(tile) {
+    var p = tile.geometry.processed;
+    return (p.top && p.bottom && p.left && p.right);
+  }
+
+
+  function allSidesProcessed(tile) {
+    var p = tile.geometry.processed;
+    return (p.topLeft && p.bottomLeft && p.bottomRight && p.topRight);
+  }
+
+
+  function checkTileProcessed(tile) {
+    if (sidesProcessed(tile)) {
+      tile.geometry.processed.allSides = true;
+      if (allSidesProcessed(tile)) {
+        tile.geometry.processed.all = true;
+      }
+    }
+  }
+
+
+  function createQueryParams(params) {
+    var list = [];
+    var key;
+    for (key in params) {
+      if (params.hasOwnProperty(key)) {
+        list.push(key + '=' + params[key]);
+      }
+    }
+    return list.join('&');
+  }
+
+
   ns.ThreeDMap = function (layers, dim) {
     var i, length;
     this.dim = dim;
@@ -107,8 +157,8 @@ var wxs3 = this.wxs3 || {};
       cameraHeight = (this.dim.metersHeight / 2) / Math.tan((fov / 2) * Math.PI / 180);
     }
     // Place camera in middle of bbox
-    centerX = (this.dim.minx + this.dim.maxx) / 2;
-    centerY = (this.dim.miny + this.dim.maxy) / 2;
+    centerX = avg(this.dim.minx, this.dim.maxx);
+    centerY = avg(this.dim.miny, this.dim.maxy);
     this.camera.position.set(centerX, centerY, cameraHeight);
     this.raycaster = new THREE.Raycaster(this.camera.position, this.vector);
   };
@@ -118,20 +168,22 @@ var wxs3 = this.wxs3 || {};
     var centerX;
     this.controls = new THREE.TrackballControls(this.camera);
     // Point camera directly down
-    centerX = (this.dim.minx + this.dim.maxx) / 2;
-    centerY = (this.dim.miny + this.dim.maxy) / 2;
+    centerX = avg(this.dim.minx, this.dim.maxx);
+    centerY = avg(this.dim.miny, this.dim.maxy);
     this.controls.target = new THREE.Vector3(centerX, centerY, 0);
   };
 
   ns.ThreeDMap.prototype.render = function () {
     var i;
+    var child;
     for (i = 0; i < this.foregroundGroup.children.length; i++) {
-      if (this.foregroundGroup.children[i].scale.z < 1 && this.foregroundGroup.children[i].geometry.loaded === true) {
-        this.foregroundGroup.children[i].scale.z += 0.02;
-      } else if (this.foregroundGroup.children[i].scale.z >= 1) {
-        //this.foregroundGroup.children[i].material.wireframe=false;
-        if (this.foregroundGroup.children[i].geometry.processed.all === false) {
-          this.neighbourTest(this.foregroundGroup.children[i].WMTSCall);
+      child = this.foregroundGroup.children[i];
+      if (child.scale.z < 1 && child.geometry.loaded === true) {
+        child.scale.z += 0.02;
+      } else if (child.scale.z >= 1) {
+        //child.material.wireframe=false;
+        if (child.geometry.processed.all === false) {
+          this.neighbourTest(child.WMTSCall);
         }
       }
     }
@@ -142,8 +194,16 @@ var wxs3 = this.wxs3 || {};
   };
 
   ns.ThreeDMap.prototype.generateTiles = function () {
-    var capabilitiesURL = this.dim.wmtsUrl + '?Version=1.0.0&service=WMTS&request=getcapabilities';
-    var WMTSCapabilities = new ns.WMTS(capabilitiesURL, this.dim.crs, this.dim.wmtsLayer);
+    var capabilitiesURL = this.dim.wmtsUrl + '?' + createQueryParams({
+      Version: '1.0.0',
+      service: 'WMTS',
+      request: 'getCapabilities'
+    });
+    var WMTSCapabilities = new ns.WMTS(
+      capabilitiesURL,
+      this.dim.crs,
+      this.dim.wmtsLayer
+    );
     var that = this;
     WMTSCapabilities.fetchCapabilities(function (tileMatrixSet) {
       that.bbox2tiles(tileMatrixSet);
@@ -174,25 +234,33 @@ var wxs3 = this.wxs3 || {};
     // Here we find the first matrix that has a tilespan smaller than that of the smallest dimension of the input bbox.
     // We can control the resolution of the images by altering how large a difference there must be (half, quarter etc.)
     spanDivisor = 4;
+    var obj;
     for (tileMatrix = 0; tileMatrix < tileMatrixCount; tileMatrix++) {
+      obj = tileMatrixSet[tileMatrix];
       if (querySpanMinDim === 'x') {
-        if (tileMatrixSet[tileMatrix].TileSpanX < querySpanMin / spanDivisor) {
-          this.foregroundMatrix = tileMatrixSet[tileMatrix];
+        if (obj.TileSpanX < querySpanMin / spanDivisor) {
+          this.foregroundMatrix = obj;
           this.backgroundMatrix = tileMatrixSet[tileMatrix - 1];
           break;
         }
-      } else if (tileMatrixSet[tileMatrix].TileSpanY < querySpanMin / spanDivisor) {
-        this.foregroundMatrix = tileMatrixSet[tileMatrix];
+      } else if (obj.TileSpanY < querySpanMin / spanDivisor) {
+        this.foregroundMatrix = obj;
         this.backgroundMatrix = tileMatrixSet[tileMatrix - 1];
         break;
       }
     }
-    tmpBounds = new THREE.Vector2((bounds.maxx + bounds.minx) / 2, (bounds.maxy + bounds.miny) / 2);
+    tmpBounds = new THREE.Vector2(
+      avg(bounds.maxx, bounds.minx),
+      avg(bounds.maxy, bounds.miny)
+    );
     WMTSCalls = this.centralTileFetcher(tmpBounds, this.backgroundMatrix);
     this.tileLoader(WMTSCalls, false);
     for (i = 0; i < WMTSCalls.length; i++) {
-      this.mainTileLoader({zoom: WMTSCalls[i].zoom, tileRow: WMTSCalls[i].tileRow, tileCol: WMTSCalls[i].tileCol});
-
+      this.mainTileLoader({
+        zoom: WMTSCalls[i].zoom,
+        tileRow: WMTSCalls[i].tileRow,
+        tileCol: WMTSCalls[i].tileCol
+      });
     }
 
   };
@@ -210,7 +278,7 @@ var wxs3 = this.wxs3 || {};
     // Here we generate tileColumns and tileRows as well as  translate tilecol and tilerow to boundingboxes
     for (tc = tileColMin; tc <= tileColMax; tc++) {
       for (tr = tileRowMin; tr <= tileRowMax; tr++) {
-        name = activeMatrix.Zoom + '_' + tr + '_' + tc;
+        name = getTileName(activeMatrix.Zoom, tr, tc);
         if (this.backgroundTiles.indexOf(name) === -1) {
           this.backgroundTiles.push(name);
           WMTSCalls.push(this.singleTileFetcher(tc, tr, activeMatrix));
@@ -220,13 +288,37 @@ var wxs3 = this.wxs3 || {};
     return WMTSCalls;
   };
 
+  function getNeighbourNames(zoom, tileRow, tileCol) {
+    var row;
+    var col;
+    var i = 0;
+    var pos = [
+      'topLeft', 'top', 'topRight',
+      'left', null, 'right',
+      'bottomLeft', 'bottom', 'bottomRight',
+    ];
+    var name;
+    var neighbours = {};
+    for (row = -1; row <= 1; row++) {
+      for (col = -1; col <= 1; col++) {
+        name = pos[i];
+        if (name) {
+          neighbours[name] = getTileName(zoom, tileRow + row, tileCol + col);
+        }
+        i++;
+      }
+    }
+    return neighbours;
+  }
+
   ns.ThreeDMap.prototype.singleTileFetcher = function (tileCol, tileRow, activeMatrix) {
     var WMTSCall;
+    var topLeft = activeMatrix.TopLeftCorner;
     var wmsBounds = [
-        activeMatrix.TopLeftCorner.minx + (tileCol * activeMatrix.TileSpanX),
-        activeMatrix.TopLeftCorner.maxy - ((tileRow + 1) * activeMatrix.TileSpanY),
-        activeMatrix.TopLeftCorner.minx + ((tileCol + 1) * activeMatrix.TileSpanX),
-        activeMatrix.TopLeftCorner.maxy - (tileRow * activeMatrix.TileSpanY)
+        topLeft.minx + (tileCol * activeMatrix.TileSpanX),
+        topLeft.maxy - ((tileRow + 1) * activeMatrix.TileSpanY),
+        topLeft.minx + ((tileCol + 1) * activeMatrix.TileSpanX),
+        topLeft.maxy - (tileRow * activeMatrix.TileSpanY)
       ];
     var TileSpanY = activeMatrix.TileSpanY;
     var TileSpanX = activeMatrix.TileSpanX;
@@ -246,15 +338,65 @@ var wxs3 = this.wxs3 || {};
       tileRow: tileRow,
       tileCol: tileCol,
       zoom: activeMatrix.Zoom,
+      neighbours: getNeighbourNames(activeMatrix.Zoom, tileRow, tileCol),
       // Setting these for easy debugging
       // TODO: define parameters here for reuse later on
       url: {
-        cache_WMTS: this.dim.wmtsUrl + '?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&Style=default&Format=image/png&Layer=' + this.dim.wmtsLayer + '&TileMatrixSet=' + activeMatrix.TileMatrixSetIdentifier + '&TileMatrix=' + activeMatrix.Identifier + '&TileRow=' + tileRow + '&TileCol=' + tileCol,
-        cache_wms: this.dim.wmscUrl + 'REQUEST=GetMap&SERVICE=WMS&VERSION=1.3.0&Layer=topo2&Style=default&Format=image/png&width=256&height=256&crs=EPSG:' + activeMatrix.Identifier.split(':')[1] + '&BBOX=' + wmsBounds.join(','),
-        wms: this.dim.wmsUrl + '?GKT=' + this.dim.gatekeeperTicket + '&REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.1&Layers=' + this.dim.wmsLayers + '&Style=default&Format=image/jpeg&WIDTH=256&HEIGHT=256&SRS=EPSG:' + activeMatrix.Identifier.split(':')[1] + '&BBOX=' + wmsBounds.join(','),
+        cache_WMTS: this.dim.wmtsUrl + '?' + createQueryParams({
+          REQUEST: 'GetTile',
+          SERVICE: 'WMTS',
+          VERSION: '1.0.0',
+          Style: 'default',
+          Format: 'image/png',
+          Layer: this.dim.wmtsLayer,
+          TileMatrixSet: activeMatrix.TileMatrixSetIdentifier,
+          TileMatrix: activeMatrix.Identifier,
+          TileRow: tileRow,
+          TileCol: tileCol
+        }),
+        cache_wms: this.dim.wmscUrl + '?' + createQueryParams({
+          REQUEST: 'GetMap',
+          SERVICE: 'WMS',
+          VERSION: '1.3.0',
+          Layer: 'topo2',
+          Style: 'default',
+          Format: 'image/png',
+          width: 256,
+          height: 256,
+          crs: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
+          BBOX: wmsBounds.join(',')
+        }),
+        wms: this.dim.wmsUrl + '?' + createQueryParams({
+          GKT: this.dim.gatekeeperTicket,
+          REQUEST: 'GetMap',
+          SERVICE: 'WMS',
+          VERSION: '1.1.1',
+          Layers: this.dim.wmsLayers,
+          Style: 'default',
+          Format: 'image/jpeg',
+          WIDTH: 256,
+          HEIGHT: 256,
+          SRS: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
+          BBOX: wmsBounds.join(',')
+        }),
         //wcs 1.1.0 NOT WORKING with XYZ - needs to drop xml-part to use tiff-js?
         //wcs: 'http://wcs.geonorge.no/skwms1/wcs.dtm?SERVICE=WCS&VERSION=1.1.0&REQUEST=GetCoverage&FORMAT=geotiff&IDENTIFIER=all_50m&BOUNDINGBOX='+ wcsBounds.join(',')  +',urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridBaseCRS=urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridCS=urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridType=urn:ogc:def:method:WCS:1.1:2dGridIn2dCrs&GridOrigin=' +wmsBounds[0] +',' +wmsBounds[1] +'&GridOffsets='+grid2rasterUnitsX +',' +grid2rasterUnitsY + '&RangeSubset=50m:average' //[bands[1]]'
-        wcs: this.dim.wcsUrl + '?SERVICE=WCS&VERSION=1.0.0&REQUEST=GetCoverage&FORMAT=geotiff&WIDTH=' + parseInt(this.dim.demWidth, 10) + '&HEIGHT=' + parseInt(this.dim.demWidth, 10) + '&COVERAGE=' + this.dim.coverage + '&crs=EPSG:' + this.dim.crs + '&BBOX=' + wcsBounds.join(',') // + '&INTERPOLATION=BILINEAR' //+'&RESPONSE_CRS=EPSG:'+activeMatrix.Identifier.split(':')[1] //+ '&RangeSubset=50m:average[bands[1]]' +'&RESX='+grid2rasterUnitsX+'&RESY='+grid2rasterUnitsY
+        wcs: this.dim.wcsUrl + '?' + createQueryParams({
+          SERVICE: 'WCS',
+          VERSION: '1.0.0',
+          REQUEST: 'GetCoverage',
+          FORMAT: 'geotiff',
+          WIDTH: parseInt(this.dim.demWidth, 10),
+          HEIGHT: parseInt(this.dim.demWidth, 10),
+          COVERAGE: this.dim.coverage,
+          crs: 'EPSG:' + this.dim.crs,
+          BBOX: wcsBounds.join(',') //,
+          //INTERPOLATION: 'BILINEAR',
+          //RESPONSE_CRS: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
+          //RangeSubset='50m',
+          //RESX: grid2rasterUnitsX,
+          //RESY: grid2rasterUnitsY
+        })
       },
       bounds: {
         minx: wmsBounds[0],
@@ -271,13 +413,16 @@ var wxs3 = this.wxs3 || {};
     this.vector = new THREE.Vector3(0, 0, -1);
     this.vector.applyQuaternion(this.camera.quaternion);
     this.raycaster = new THREE.Raycaster(this.camera.position, this.vector);
-    this.intersects = this.raycaster.intersectObjects(this.backgroundGroup.children);
+    this.intersects = this.raycaster.intersectObjects(
+      this.backgroundGroup.children
+    );
     if (this.intersects.length > 0) {
       tileName = this.intersects[0].object.tileName;
       this.mainTileLoader(tileName);
 
     }
   };
+
   ns.ThreeDMap.prototype.mainTileLoader = function (tileName) {
     var neighbourCall;
     var neighbourCalls = this.backGroundTileNeighbours(tileName);
@@ -290,8 +435,11 @@ var wxs3 = this.wxs3 || {};
     }
     // remove processed background
     // TODO: Find out if we need to run geometry.dispose() first.
-    this.backgroundGroup.getObjectByName(tileName.zoom + '_' + tileName.tileRow + '_' + tileName.tileCol).geometry.dispose();
-    this.backgroundGroup.remove(this.backgroundGroup.getObjectByName(tileName.zoom + '_' + tileName.tileRow + '_' + tileName.tileCol));
+    var obj = this.backgroundGroup.getObjectByName(
+      join(tileName.zoom, tileName.tileRow, tileName.tileCol)
+    );
+    obj.geometry.dispose();
+    this.backgroundGroup.remove(obj);
   };
 
   ns.ThreeDMap.prototype.tileChildren = function (tileName) {
@@ -307,10 +455,10 @@ var wxs3 = this.wxs3 || {};
     for (tc = tileColMin; tc <= tileColMax; tc++) {
       for (tr = tileRowMin; tr <= tileRowMax; tr++) {
         //if (this.foregroundTiles.indexOf(name.zoom+'_'+tr+'_'+tc) ==-1) {
-        if (this.foregroundGroup.getObjectByName(tileName.zoom + '_' + tr + '_' + tc) === undefined) {
+        if (this.foregroundGroup.getObjectByName(getTileName(tileName.zoom, tr, tc)) === undefined) {
           // Add tile to index over loaded tiles
           // TODO: Do we still use this?
-          this.foregroundTiles.push((tileName.zoom + 1) + '_' + tr + '_' + tc);
+          this.foregroundTiles.push(getTileName(tileName.zoom + 1, tr, tc));
           WMTSCalls.push(this.singleTileFetcher(tc, tr, this.foregroundMatrix));
         }
       }
@@ -331,8 +479,8 @@ var wxs3 = this.wxs3 || {};
     for (tc = tileColMin; tc <= tileColMax; tc++) {
       for (tr = tileRowMin; tr <= tileRowMax; tr++) {
       // TODO: Why do we still use this instead of backgroundGroup.getObjectByName()
-        if (this.backgroundTiles.indexOf(tileName.zoom + '_' + tr + '_' + tc) === -1) {
-          this.backgroundTiles.push(tileName.zoom + '_' + tr + '_' + tc);
+        if (this.backgroundTiles.indexOf(getTileName(tileName.zoom, tr, tc)) === -1) {
+          this.backgroundTiles.push(getTileName(tileName.zoom, tr, tc));
           WMTSCalls.push(this.singleTileFetcher(tc, tr, this.backgroundMatrix));
         }
       }
@@ -343,16 +491,23 @@ var wxs3 = this.wxs3 || {};
   ns.ThreeDMap.prototype.tileLoader = function (WMTSCalls, visible) {
     var WCSTile, concatName, geometry, material, i;
     var activeUrl;
+    var wmtsCall;
     for (i = 0; i < WMTSCalls.length; i++) {
+      wmtsCall = WMTSCalls[i];
       material = null;
       geometry = null;
-      concatName = WMTSCalls[i].zoom + '_' + WMTSCalls[i].tileRow + '_' + WMTSCalls[i].tileCol;
+      concatName = getTileName(wmtsCall.zoom, wmtsCall.tileRow, wmtsCall.tileCol);
       if (visible) {
         // Hack for CORS?
         THREE.ImageUtils.crossOrigin = "";
 
-        WCSTile = new ns.WCS(WMTSCalls[i].tileSpanX, WMTSCalls[i].tileSpanY, this.dim.demWidth - 1, this.dim.demHeight - 1);
-        WCSTile.wcsFetcher(WMTSCalls[i]);
+        WCSTile = new ns.WCS(
+          wmtsCall.tileSpanX,
+          wmtsCall.tileSpanY,
+          this.dim.demWidth - 1,
+          this.dim.demHeight - 1
+        );
+        WCSTile.wcsFetcher(wmtsCall);
         geometry = WCSTile.geometry;
         geometry.processed = {
           left: false,
@@ -369,11 +524,13 @@ var wxs3 = this.wxs3 || {};
 
 
         if (this.dim.wmsUrl) {
-          activeUrl = WMTSCalls[i].url.wms;
+          activeUrl = wmtsCall.url.wms;
         } else {
-          activeUrl = WMTSCalls[i].url.cache_WMTS;
+          activeUrl = wmtsCall.url.cache_WMTS;
         }
-        // TODO: Create a loader for images based on the WCS-loader. This allows us to check if the image actually loads and reload if something fails. Also, we can use wireframes as a placeholder.
+        // TODO: Create a loader for images based on the WCS-loader.
+        //This allows us to check if the image actually loads and reload
+        //if something fails. Also, we can use wireframes as a placeholder.
         material = new THREE.MeshBasicMaterial(
           {
 
@@ -389,25 +546,25 @@ var wxs3 = this.wxs3 || {};
         //material.depthWrite=false;
         //material.map.image.hidden=true;
       } else {
-        geometry = new THREE.PlaneGeometry(WMTSCalls[i].tileSpanX, WMTSCalls[i].tileSpanY);
-        material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+        geometry = new THREE.PlaneGeometry(wmtsCall.tileSpanX, wmtsCall.tileSpanY);
+        material = new THREE.MeshBasicMaterial({color: 0xff0000, wireframe: true});
       }
       this.mesh = new THREE.Mesh(
         geometry,
         material
       );
-      this.mesh.position.x = WMTSCalls[i].bounds.minx + (WMTSCalls[i].tileSpanX / 2);
-      this.mesh.position.y = WMTSCalls[i].bounds.miny + (WMTSCalls[i].tileSpanY / 2);
+      this.mesh.position.x = wmtsCall.bounds.minx + (wmtsCall.tileSpanX / 2);
+      this.mesh.position.y = wmtsCall.bounds.miny + (wmtsCall.tileSpanY / 2);
       this.mesh.tileName = {
-        zoom: WMTSCalls[i].zoom,
-        tileRow: WMTSCalls[i].tileRow,
-        tileCol: WMTSCalls[i].tileCol
+        zoom: wmtsCall.zoom,
+        tileRow: wmtsCall.tileRow,
+        tileCol: wmtsCall.tileCol
       };
       this.mesh.name = concatName;
-      this.mesh.bounds = WMTSCalls[i].bounds;
-      this.mesh.url = WMTSCalls[i].url;
+      this.mesh.bounds = wmtsCall.bounds;
+      this.mesh.url = wmtsCall.url;
       this.mesh.scale.z = 0.02;
-      this.mesh.WMTSCall = WMTSCalls[i];
+      this.mesh.WMTSCall = wmtsCall;
       this.tileLoaded(this.mesh, visible);
     }
   };
@@ -421,10 +578,6 @@ var wxs3 = this.wxs3 || {};
     }
   };
 
-  function join() {
-    return Array.prototype.slice.call(arguments).join('_');
-  }
-
   ns.ThreeDMap.prototype.testTile = function (tile, neighbours, side) {
     if (!tile.geometry.processed[side]) {
       this.geometryEdgeTester(tile, neighbours[side], side);
@@ -432,17 +585,8 @@ var wxs3 = this.wxs3 || {};
   };
 
   ns.ThreeDMap.prototype.neighbourTest = function (WMTSCall) {
-    var name = join(WMTSCall.zoom, WMTSCall.tileRow, WMTSCall.tileCol);
-    var neighbours = {
-      top: join(WMTSCall.zoom, (WMTSCall.tileRow - 1), WMTSCall.tileCol),
-      bottom: join(WMTSCall.zoom, (WMTSCall.tileRow + 1), WMTSCall.tileCol),
-      left: join(WMTSCall.zoom, WMTSCall.tileRow, (WMTSCall.tileCol - 1)),
-      right: join(WMTSCall.zoom, WMTSCall.tileRow, (WMTSCall.tileCol + 1)),
-      topLeft: join(WMTSCall.zoom, (WMTSCall.tileRow - 1), (WMTSCall.tileCol - 1)),
-      topRight: join(WMTSCall.zoom, (WMTSCall.tileRow - 1), (WMTSCall.tileCol + 1)),
-      bottomLeft: join(WMTSCall.zoom, (WMTSCall.tileRow + 1), (WMTSCall.tileCol - 1)),
-      bottomRight: join(WMTSCall.zoom, (WMTSCall.tileRow + 1), (WMTSCall.tileCol + 1))
-    };
+    var name = getTileName(WMTSCall.zoom, WMTSCall.tileRow, WMTSCall.tileCol);
+    var neighbours = WMTSCall.neighbours;
 
     var tile = this.foregroundGroup.getObjectByName(name);
     // If the tile is already processed on edges we skip
@@ -495,26 +639,6 @@ var wxs3 = this.wxs3 || {};
 
     }
   };
-
-
-  function sidesProcessed(tile) {
-    var p = tile.geometry.processed;
-    return (p.top && p.bottom && p.left && p.right);
-  }
-
-  function allSidesProcessed(tile) {
-    var p = tile.geometry.processed;
-    return (p.topLeft && p.bottomLeft && p.bottomRight && p.topRight);
-  }
-
-  function checkTileProcessed(tile) {
-    if (sidesProcessed(tile)) {
-      tile.geometry.processed.allSides = true;
-      if (allSidesProcessed(tile)) {
-        tile.geometry.processed.all = true;
-      }
-    }
-  }
 
   ns.ThreeDMap.prototype.geometryEdgeFixer = function (tile, neighbour, placement) {
     var i, oppositeEdge;
