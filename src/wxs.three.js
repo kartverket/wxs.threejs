@@ -269,12 +269,12 @@ var wxs3 = this.wxs3 || {};
 
   ns.ThreeDMap.prototype.createCamera = function () {
     var centerY, centerX, cameraHeight;
-    var fov = 45;
+    var fov = 45; // magic number
     this.camera = new THREE.PerspectiveCamera(
       fov,
       this.dim.width / this.dim.height,
-      0.1,
-      5000000
+      0.1, // magic number
+      5000000 // magic number
     );
     // Some trig to find height for camera
     if (!!this.dim.Z) {
@@ -439,12 +439,11 @@ var wxs3 = this.wxs3 || {};
   };
 
   ns.ThreeDMap.prototype.singleTileFetcher = function (tileCol, tileRow, activeMatrix) {
-    var WMTSCall;
-    var wmsBounds = createWmsBounds(activeMatrix, tileCol, tileRow);
     var tileSpanY = activeMatrix.TileSpanY;
     var tileSpanX = activeMatrix.TileSpanX;
+    var wmsBounds = createWmsBounds(activeMatrix, tileCol, tileRow);
     var wcsBounds = createWcsBounds(this.dim, tileSpanX, tileSpanY, wmsBounds);
-    WMTSCall = {
+    return {
       tileSpanX: tileSpanX,
       tileSpanY: tileSpanY,
       tileRow: tileRow,
@@ -468,11 +467,9 @@ var wxs3 = this.wxs3 || {};
         maxy: wmsBounds[3]
       }
     };
-    return WMTSCall;
   };
 
   ns.ThreeDMap.prototype.caster = function () {
-    var tileName = null;
     this.vector = new THREE.Vector3(0, 0, -1);
     this.vector.applyQuaternion(this.camera.quaternion);
     this.raycaster = new THREE.Raycaster(this.camera.position, this.vector);
@@ -480,9 +477,8 @@ var wxs3 = this.wxs3 || {};
       this.backgroundGroup.children
     );
     if (this.intersects.length > 0) {
-      tileName = this.intersects[0].object.tileName;
+      var tileName = this.intersects[0].object.tileName;
       this.mainTileLoader(tileName);
-
     }
   };
 
@@ -560,7 +556,6 @@ var wxs3 = this.wxs3 || {};
           allSides: false,
           all: false
         };
-
 
         if (this.dim.wmsUrl) {
           activeUrl = wmtsCall.url.wms;
@@ -677,9 +672,8 @@ var wxs3 = this.wxs3 || {};
   };
 
   ns.ThreeDMap.prototype.geometryEdgeFixer = function (tile, neighbour, placement) {
-    var i, oppositeEdge;
     // Edges
-    oppositeEdge = {
+    var oppositeEdge = {
       top: 'bottom',
       bottom: 'top',
       left: 'right',
@@ -690,6 +684,7 @@ var wxs3 = this.wxs3 || {};
       bottomLeft: 'topRight'
     };
 
+    var i;
     for (i = 0; i < this.edges[placement].length; i++) {
       tile.geometry.vertices[this.edges[placement][i]].z = (tile.geometry.vertices[this.edges[placement][i]].z + neighbour.geometry.vertices[this.edges[oppositeEdge[placement]][i]].z) / 2;
       neighbour.geometry.vertices[this.edges[oppositeEdge[placement]][i]].z = tile.geometry.vertices[this.edges[placement][i]].z;
