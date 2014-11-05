@@ -394,7 +394,7 @@ var wxs3 = this.wxs3 || {};
     }
   };
 
-  ns.ThreeDMap.prototype.createWMTSCalls = function (group, matrix, tileCol, tileRow) {
+  ns.ThreeDMap.prototype.createWMTSCalls = function (group, matrix, tileCol, tileRow, zoom) {
     var tr, tc;
     var WMTSCalls = [];
     var name = null;
@@ -406,7 +406,7 @@ var wxs3 = this.wxs3 || {};
     // translate tilecol and tilerow to boundingboxes
     for (tc = tileColMin; tc <= tileColMax; tc++) {
       for (tr = tileRowMin; tr <= tileRowMax; tr++) {
-        name = getTileName(matrix.Zoom, tr, tc);
+        name = getTileName(zoom, tr, tc);
         if (group.indexOf(name) === -1) {
           group.push(name);
           WMTSCalls.push(this.singleTileFetcher(tc, tr, matrix));
@@ -423,7 +423,8 @@ var wxs3 = this.wxs3 || {};
       this.backgroundTiles,
       activeMatrix,
       tileCol,
-      tileRow
+      tileRow,
+      activeMatrix.Zoom
     );
   };
 
@@ -434,7 +435,20 @@ var wxs3 = this.wxs3 || {};
       this.foregroundTiles,
       this.foregroundMatrix,
       tileCol,
-      tileRow
+      tileRow,
+      this.foregroundMatrix.Zoom
+    );
+  };
+
+  ns.ThreeDMap.prototype.backGroundTileNeighbours = function (tileName) {
+    var tileCol = tileName.tileCol;
+    var tileRow = tileName.tileRow;
+    return this.createWMTSCalls(
+      this.backgroundTiles,
+      this.backgroundMatrix,
+      tileCol,
+      tileRow,
+      tileName.zoom
     );
   };
 
@@ -499,28 +513,6 @@ var wxs3 = this.wxs3 || {};
     );
     obj.geometry.dispose();
     this.backgroundGroup.remove(obj);
-  };
-
-  ns.ThreeDMap.prototype.backGroundTileNeighbours = function (tileName) {
-    var tr, tc;
-    var WMTSCalls = [];
-    var tileCol = tileName.tileCol;
-    var tileRow = tileName.tileRow;
-    var tileColMin = tileCol - 1;
-    var tileRowMin = tileRow - 1;
-    var tileColMax = tileCol + 1;
-    var tileRowMax = tileRow + 1;
-    // Here we generate tileColumns and tileRows as well as  translate tilecol and tilerow to boundingboxes
-    for (tc = tileColMin; tc <= tileColMax; tc++) {
-      for (tr = tileRowMin; tr <= tileRowMax; tr++) {
-      // TODO: Why do we still use this instead of backgroundGroup.getObjectByName()
-        if (this.backgroundTiles.indexOf(getTileName(tileName.zoom, tr, tc)) === -1) {
-          this.backgroundTiles.push(getTileName(tileName.zoom, tr, tc));
-          WMTSCalls.push(this.singleTileFetcher(tc, tr, this.backgroundMatrix));
-        }
-      }
-    }
-    return WMTSCalls;
   };
 
   ns.ThreeDMap.prototype.tileLoader = function (WMTSCalls, visible) {
