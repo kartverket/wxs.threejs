@@ -79,6 +79,108 @@ var wxs3 = this.wxs3 || {};
   }
 
 
+  function createWmtsUrl(dim, matrix, tileRow, tileCol) {
+    return dim.wmtsUrl + '?' + createQueryParams({
+      REQUEST: 'GetTile',
+      SERVICE: 'WMTS',
+      VERSION: '1.0.0',
+      Style: 'default',
+      Format: 'image/png',
+      Layer: dim.wmtsLayer,
+      TileMatrixSet: matrix.TileMatrixSetIdentifier,
+      TileMatrix: matrix.Identifier,
+      TileRow: tileRow,
+      TileCol: tileCol
+    });
+  }
+
+
+  function createCacheWmsUrl(dim, activeMatrix, wmsBounds) {
+    return dim.wmscUrl + '?' + createQueryParams({
+      REQUEST: 'GetMap',
+      SERVICE: 'WMS',
+      VERSION: '1.3.0',
+      Layer: 'topo2',
+      Style: 'default',
+      Format: 'image/png',
+      width: 256,
+      height: 256,
+      crs: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
+      BBOX: wmsBounds.join(',')
+    });
+  }
+
+
+  function createWmsUrl(dim, activeMatrix, wmsBounds) {
+    return dim.wmsUrl + '?' + createQueryParams({
+      GKT: dim.gatekeeperTicket,
+      REQUEST: 'GetMap',
+      SERVICE: 'WMS',
+      VERSION: '1.1.1',
+      Layers: dim.wmsLayers,
+      Style: 'default',
+      Format: 'image/jpeg',
+      WIDTH: 256,
+      HEIGHT: 256,
+      SRS: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
+      BBOX: wmsBounds.join(',')
+    });
+  }
+
+
+  /*
+  function createWcs111Url(dim, wcsBounds) {
+    //wcs 1.1.0 NOT WORKING with XYZ - needs to drop xml-part to use tiff-js?
+    //'http://wcs.geonorge.no/skwms1/wcs.dtm?SERVICE=WCS&VERSION=1.1.0&REQUEST=GetCoverage&FORMAT=geotiff&IDENTIFIER=all_50m&BOUNDINGBOX='+ wcsBounds.join(',')  +',urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridBaseCRS=urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridCS=urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridType=urn:ogc:def:method:WCS:1.1:2dGridIn2dCrs&GridOrigin=' +wmsBounds[0] +',' +wmsBounds[1] +'&GridOffsets='+grid2rasterUnitsX +',' +grid2rasterUnitsY + '&RangeSubset=50m:average' //[bands[1]]'
+  }
+  */
+
+
+  function createWcsUrl(dim, wcsBounds) {
+    return dim.wcsUrl + '?' + createQueryParams({
+      SERVICE: 'WCS',
+      VERSION: '1.0.0',
+      REQUEST: 'GetCoverage',
+      FORMAT: 'geotiff',
+      WIDTH: parseInt(dim.demWidth, 10),
+      HEIGHT: parseInt(dim.demWidth, 10),
+      COVERAGE: dim.coverage,
+      crs: 'EPSG:' + dim.crs,
+      BBOX: wcsBounds.join(',') //,
+      //INTERPOLATION: 'BILINEAR',
+      //RESPONSE_CRS: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
+      //RangeSubset='50m',
+      //RESX: grid2rasterUnitsX,
+      //RESY: grid2rasterUnitsY
+    });
+  }
+
+
+  function createWmsBounds(activeMatrix, tileCol, tileRow) {
+    var topLeft = activeMatrix.TopLeftCorner;
+    return [
+      topLeft.minx + (tileCol * activeMatrix.TileSpanX),
+      topLeft.maxy - ((tileRow + 1) * activeMatrix.TileSpanY),
+      topLeft.minx + ((tileCol + 1) * activeMatrix.TileSpanX),
+      topLeft.maxy - (tileRow * activeMatrix.TileSpanY)
+    ];
+  }
+
+
+  function createWcsBounds(dim, tileSpanX, tileSpanY, wmsBounds) {
+    var wcsDivisor = 2;
+    var grid2rasterUnitsX = ((tileSpanX / (dim.demHeight - 1)));
+    var grid2rasterUnitsY = ((tileSpanY / (dim.demWidth - 1)));
+    return [
+      // Add some to the extents as we need to put values from a raster onto a grid. Bazingah!
+      (wmsBounds[0] - (grid2rasterUnitsX / wcsDivisor)), //minx
+      (wmsBounds[1] - (grid2rasterUnitsY / wcsDivisor)), //miny
+      (wmsBounds[2] + (grid2rasterUnitsX / wcsDivisor)), //maxx
+      (wmsBounds[3] + (grid2rasterUnitsY / wcsDivisor)) //maxy
+    ];
+  }
+
+
   ns.ThreeDMap = function (layers, dim) {
     var i, length;
     this.dim = dim;
@@ -290,7 +392,6 @@ var wxs3 = this.wxs3 || {};
         tileCol: WMTSCalls[i].tileCol
       });
     }
-
   };
 
   ns.ThreeDMap.prototype.createWMTSCalls = function (group, matrix, tileCol, tileRow) {
@@ -313,7 +414,7 @@ var wxs3 = this.wxs3 || {};
       }
     }
     return WMTSCalls;
-  }
+  };
 
   ns.ThreeDMap.prototype.centralTileFetcher = function (bounds, activeMatrix) {
     var tileCol = Math.floor((bounds.x - activeMatrix.TopLeftCorner.minx) / activeMatrix.TileSpanX);
@@ -339,28 +440,13 @@ var wxs3 = this.wxs3 || {};
 
   ns.ThreeDMap.prototype.singleTileFetcher = function (tileCol, tileRow, activeMatrix) {
     var WMTSCall;
-    var topLeft = activeMatrix.TopLeftCorner;
-    var wmsBounds = [
-        topLeft.minx + (tileCol * activeMatrix.TileSpanX),
-        topLeft.maxy - ((tileRow + 1) * activeMatrix.TileSpanY),
-        topLeft.minx + ((tileCol + 1) * activeMatrix.TileSpanX),
-        topLeft.maxy - (tileRow * activeMatrix.TileSpanY)
-      ];
-    var TileSpanY = activeMatrix.TileSpanY;
-    var TileSpanX = activeMatrix.TileSpanX;
-    var wcsDivisor = 2;
-    var grid2rasterUnitsX = ((TileSpanX / (this.dim.demHeight - 1)));
-    var grid2rasterUnitsY = ((TileSpanY / (this.dim.demWidth - 1)));
-    var wcsBounds = [
-      // Add some to the extents as we need to put values from a raster onto a grid. Bazingah!
-      (wmsBounds[0] - (grid2rasterUnitsX / wcsDivisor)), //minx
-      (wmsBounds[1] - (grid2rasterUnitsY / wcsDivisor)), //miny
-      (wmsBounds[2] + (grid2rasterUnitsX / wcsDivisor)), //maxx
-      (wmsBounds[3] + (grid2rasterUnitsY / wcsDivisor)) //maxy
-    ];
+    var wmsBounds = createWmsBounds(activeMatrix, tileCol, tileRow);
+    var tileSpanY = activeMatrix.TileSpanY;
+    var tileSpanX = activeMatrix.TileSpanX;
+    var wcsBounds = createWcsBounds(this.dim, tileSpanX, tileSpanY, wmsBounds);
     WMTSCall = {
-      tileSpanX: TileSpanX,
-      tileSpanY: TileSpanY,
+      tileSpanX: tileSpanX,
+      tileSpanY: tileSpanY,
       tileRow: tileRow,
       tileCol: tileCol,
       zoom: activeMatrix.Zoom,
@@ -368,61 +454,12 @@ var wxs3 = this.wxs3 || {};
       // Setting these for easy debugging
       // TODO: define parameters here for reuse later on
       url: {
-        cache_WMTS: this.dim.wmtsUrl + '?' + createQueryParams({
-          REQUEST: 'GetTile',
-          SERVICE: 'WMTS',
-          VERSION: '1.0.0',
-          Style: 'default',
-          Format: 'image/png',
-          Layer: this.dim.wmtsLayer,
-          TileMatrixSet: activeMatrix.TileMatrixSetIdentifier,
-          TileMatrix: activeMatrix.Identifier,
-          TileRow: tileRow,
-          TileCol: tileCol
-        }),
-        cache_wms: this.dim.wmscUrl + '?' + createQueryParams({
-          REQUEST: 'GetMap',
-          SERVICE: 'WMS',
-          VERSION: '1.3.0',
-          Layer: 'topo2',
-          Style: 'default',
-          Format: 'image/png',
-          width: 256,
-          height: 256,
-          crs: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
-          BBOX: wmsBounds.join(',')
-        }),
-        wms: this.dim.wmsUrl + '?' + createQueryParams({
-          GKT: this.dim.gatekeeperTicket,
-          REQUEST: 'GetMap',
-          SERVICE: 'WMS',
-          VERSION: '1.1.1',
-          Layers: this.dim.wmsLayers,
-          Style: 'default',
-          Format: 'image/jpeg',
-          WIDTH: 256,
-          HEIGHT: 256,
-          SRS: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
-          BBOX: wmsBounds.join(',')
-        }),
+        cache_WMTS: createWmtsUrl(this.dim, activeMatrix, tileRow, tileCol),
+        cache_wms: createCacheWmsUrl(this.dim, activeMatrix, wmsBounds),
+        wms: createWmsUrl(this.dim, activeMatrix, wmsBounds),
         //wcs 1.1.0 NOT WORKING with XYZ - needs to drop xml-part to use tiff-js?
-        //wcs: 'http://wcs.geonorge.no/skwms1/wcs.dtm?SERVICE=WCS&VERSION=1.1.0&REQUEST=GetCoverage&FORMAT=geotiff&IDENTIFIER=all_50m&BOUNDINGBOX='+ wcsBounds.join(',')  +',urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridBaseCRS=urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridCS=urn:ogc:def:crs:EPSG::'+activeMatrix.Identifier.split(':')[1] + '&GridType=urn:ogc:def:method:WCS:1.1:2dGridIn2dCrs&GridOrigin=' +wmsBounds[0] +',' +wmsBounds[1] +'&GridOffsets='+grid2rasterUnitsX +',' +grid2rasterUnitsY + '&RangeSubset=50m:average' //[bands[1]]'
-        wcs: this.dim.wcsUrl + '?' + createQueryParams({
-          SERVICE: 'WCS',
-          VERSION: '1.0.0',
-          REQUEST: 'GetCoverage',
-          FORMAT: 'geotiff',
-          WIDTH: parseInt(this.dim.demWidth, 10),
-          HEIGHT: parseInt(this.dim.demWidth, 10),
-          COVERAGE: this.dim.coverage,
-          crs: 'EPSG:' + this.dim.crs,
-          BBOX: wcsBounds.join(',') //,
-          //INTERPOLATION: 'BILINEAR',
-          //RESPONSE_CRS: 'EPSG:' + activeMatrix.Identifier.split(':')[1],
-          //RangeSubset='50m',
-          //RESX: grid2rasterUnitsX,
-          //RESY: grid2rasterUnitsY
-        })
+        //wcs: createWcs111Url(this.dim, wcsBounds)
+        wcs: createWcsUrl(this.dim, wcsBounds)
       },
       bounds: {
         minx: wmsBounds[0],
@@ -632,10 +669,10 @@ var wxs3 = this.wxs3 || {};
   ns.ThreeDMap.prototype.geometryEdgeTester = function (tile, neighbourName, placement) {
     var neighbour = this.foregroundGroup.getObjectByName(neighbourName);
     if (!neighbour) {
-        return;
+      return;
     }
     if (neighbour.geometry.loaded && neighbour.scale.z >= 1 && tile.geometry.loaded) {
-        this.geometryEdgeFixer(tile, neighbour, placement);
+      this.geometryEdgeFixer(tile, neighbour, placement);
     }
   };
 
