@@ -293,27 +293,48 @@ var wxs3 = this.wxs3 || {};
 
   };
 
-  ns.ThreeDMap.prototype.centralTileFetcher = function (bounds, activeMatrix) {
+  ns.ThreeDMap.prototype.createWMTSCalls = function (group, matrix, tileCol, tileRow) {
     var tr, tc;
     var WMTSCalls = [];
     var name = null;
-    var tileCol = Math.floor((bounds.x - activeMatrix.TopLeftCorner.minx) / activeMatrix.TileSpanX);
-    var tileRow = Math.floor((activeMatrix.TopLeftCorner.maxy - bounds.y) / activeMatrix.TileSpanY);
     var tileColMin = tileCol - 1;
     var tileRowMin = tileRow - 1;
     var tileColMax = tileCol + 1;
     var tileRowMax = tileRow + 1;
-    // Here we generate tileColumns and tileRows as well as  translate tilecol and tilerow to boundingboxes
+    // Here we generate tileColumns and tileRows as well as
+    // translate tilecol and tilerow to boundingboxes
     for (tc = tileColMin; tc <= tileColMax; tc++) {
       for (tr = tileRowMin; tr <= tileRowMax; tr++) {
-        name = getTileName(activeMatrix.Zoom, tr, tc);
-        if (this.backgroundTiles.indexOf(name) === -1) {
-          this.backgroundTiles.push(name);
-          WMTSCalls.push(this.singleTileFetcher(tc, tr, activeMatrix));
+        name = getTileName(matrix.Zoom, tr, tc);
+        if (group.indexOf(name) === -1) {
+          group.push(name);
+          WMTSCalls.push(this.singleTileFetcher(tc, tr, matrix));
         }
       }
     }
     return WMTSCalls;
+  }
+
+  ns.ThreeDMap.prototype.centralTileFetcher = function (bounds, activeMatrix) {
+    var tileCol = Math.floor((bounds.x - activeMatrix.TopLeftCorner.minx) / activeMatrix.TileSpanX);
+    var tileRow = Math.floor((activeMatrix.TopLeftCorner.maxy - bounds.y) / activeMatrix.TileSpanY);
+    return this.createWMTSCalls(
+      this.backgroundTiles,
+      activeMatrix,
+      tileCol,
+      tileRow
+    );
+  };
+
+  ns.ThreeDMap.prototype.tileChildren = function (tileName) {
+    var tileCol = tileName.tileCol * 2;
+    var tileRow = tileName.tileRow * 2;
+    return this.createWMTSCalls(
+      this.foregroundTiles,
+      this.foregroundMatrix,
+      tileCol,
+      tileRow
+    );
   };
 
   ns.ThreeDMap.prototype.singleTileFetcher = function (tileCol, tileRow, activeMatrix) {
@@ -445,30 +466,6 @@ var wxs3 = this.wxs3 || {};
     );
     obj.geometry.dispose();
     this.backgroundGroup.remove(obj);
-  };
-
-  ns.ThreeDMap.prototype.tileChildren = function (tileName) {
-    var tr, tc;
-    var WMTSCalls = [];
-    var tileCol = tileName.tileCol * 2;
-    var tileRow = tileName.tileRow * 2;
-    var tileColMin = tileCol;
-    var tileRowMin = tileRow;
-    var tileColMax = tileCol + 1;
-    var tileRowMax = tileRow + 1;
-    // Here we generate tileColumns and tileRows as well as  translate tilecol and tilerow to boundingboxes
-    for (tc = tileColMin; tc <= tileColMax; tc++) {
-      for (tr = tileRowMin; tr <= tileRowMax; tr++) {
-        //if (this.foregroundTiles.indexOf(name.zoom+'_'+tr+'_'+tc) ==-1) {
-        if (this.foregroundGroup.getObjectByName(getTileName(tileName.zoom, tr, tc)) === undefined) {
-          // Add tile to index over loaded tiles
-          // TODO: Do we still use this?
-          this.foregroundTiles.push(getTileName(tileName.zoom + 1, tr, tc));
-          WMTSCalls.push(this.singleTileFetcher(tc, tr, this.foregroundMatrix));
-        }
-      }
-    }
-    return WMTSCalls;
   };
 
   ns.ThreeDMap.prototype.backGroundTileNeighbours = function (tileName) {
